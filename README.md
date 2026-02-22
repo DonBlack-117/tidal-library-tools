@@ -1,43 +1,43 @@
 # tidal-library-tools
 
-Conjunto de scripts en Python para gestionar tu biblioteca musical en Tidal usando la API no oficial [`tidalapi`](https://github.com/tamland/python-tidal).
+A set of Python scripts to manage your Tidal music library using the unofficial [`tidalapi`](https://github.com/tamland/python-tidal) API.
 
-## Herramientas incluidas
+## Included tools
 
-| Script | Descripción |
+| Script | Description |
 |--------|-------------|
-| `sincronizar_tidal.py` | Busca canciones de tu carpeta local en Tidal y las agrega a *My Tracks* |
-| `mejorar_calidad_tidal.py` | Reemplaza canciones en *My Tracks* por versiones de mayor calidad de audio |
-| `limpiar_duplicados_tidal.py` | Detecta y elimina canciones duplicadas en *My Tracks* |
+| `sincronizar_tidal.py` | Searches for songs from your local folder in Tidal and adds them to *My Tracks* |
+| `mejorar_calidad_tidal.py` | Replaces songs in *My Tracks* with higher audio quality versions |
+| `limpiar_duplicados_tidal.py` | Detects and removes duplicate songs from *My Tracks* |
 
-## Requisitos
+## Requirements
 
-- Python 3.8 o superior
-- Cuenta de Tidal (HiFi o HiFi Plus recomendado)
+- Python 3.8 or higher
+- Tidal account (HiFi or HiFi Plus recommended)
 
-## Instalación
+## Installation
 
 ```bash
 pip install tidalapi
 ```
 
-## Uso
+## Usage
 
-Cada script se ejecuta de forma independiente. Al correrlo por primera vez, se abrirá el navegador para que inicies sesión en Tidal.
+Each script runs independently. The first time you run it, a browser window will open for you to log in to Tidal.
 
 ```bash
-# Sincronizar música local con Tidal
+# Sync local music to Tidal
 python sincronizar_tidal.py
 
-# Mejorar calidad de audio de tu biblioteca
+# Upgrade audio quality of your library
 python mejorar_calidad_tidal.py
 
-# Eliminar duplicados
+# Remove duplicates
 python limpiar_duplicados_tidal.py
 ```
 
-## Notas
+## Notes
 
-- Los scripts respetan un límite de velocidad (`RATE_LIMIT_DELAY`) para no saturar la API de Tidal.
-- El archivo de sesión (`tidal-session.json`) guarda tu autenticación localmente y está excluido del repositorio por seguridad.
-- Los archivos `.txt` de resultados también están excluidos del repositorio.
+- Scripts respect a rate limit (`RATE_LIMIT_DELAY`) to avoid overloading the Tidal API.
+- The session file (`tidal-session.json`) stores your authentication locally and is excluded from the repository for security.
+- Result `.txt` files are also excluded from the repository.
