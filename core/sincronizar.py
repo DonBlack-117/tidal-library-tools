@@ -37,7 +37,7 @@ except ImportError:
 #   Mac     : "/Users/TuNombre/Music/Telegram"
 #   Linux   : "/home/TuNombre/Music/Telegram"
 
-MUSIC_DIR = r""
+MUSIC_DIR = os.environ.get("TIDAL_MUSIC_DIR", r"")
 
 # Pausa entre búsquedas (segundos). Sube a 1.0 si ves errores de rate limit.
 RATE_LIMIT_DELAY = 0.5
@@ -290,8 +290,9 @@ def main():
     print(f"  ❌ No encontradas en catálogo de Tidal     : {len(not_found)}")
     print(f"  ⚠️  Errores                                : {len(errors)}")
 
-    # Guardar logs
-    script_dir = Path(__file__).parent
+    # Guardar logs en logs/ (carpeta hermana de core/)
+    script_dir = Path(__file__).parent.parent / "logs"
+    script_dir.mkdir(exist_ok=True)
 
     if added:
         with open(script_dir / LOG_AGREGADAS, "a", encoding="utf-8") as f:

@@ -453,9 +453,11 @@ def main():
 
     if log_entries:
         try:
-            with open(LOG_MEJORADAS, "a", encoding="utf-8") as f:
+            logs_dir = Path(__file__).parent.parent / "logs"
+            logs_dir.mkdir(exist_ok=True)
+            with open(logs_dir / LOG_MEJORADAS, "a", encoding="utf-8") as f:
                 f.write("\n\n".join(log_entries) + "\n")
-            print(f"\n  💾 Log guardado en: {LOG_MEJORADAS}")
+            print(f"\n  💾 Log guardado en: logs/{LOG_MEJORADAS}")
         except Exception:
             pass
 

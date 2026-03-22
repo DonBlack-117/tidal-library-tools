@@ -1,14 +1,14 @@
 # tidal-library-tools
 
-A set of Python scripts to manage your Tidal music library using the unofficial [`tidalapi`](https://github.com/tamland/python-tidal) API.
+A set of Python tools to manage your Tidal music library using the unofficial [`tidalapi`](https://github.com/tamland/python-tidal) API.
 
 ## Included tools
 
 | Script | Description |
 |--------|-------------|
-| `sincronizar_tidal.py` | Searches for songs from your local folder in Tidal and adds them to *My Tracks* |
-| `mejorar_calidad_tidal.py` | Replaces songs in *My Tracks* with higher audio quality versions |
-| `limpiar_duplicados_tidal.py` | Detects and removes duplicate songs from *My Tracks* |
+| `core/sincronizar.py` | Searches for songs from your local folder in Tidal and adds them to *My Tracks* |
+| `core/mejorar_calidad.py` | Replaces songs in *My Tracks* with higher audio quality versions |
+| `core/limpiar_duplicados.py` | Detects and removes duplicate songs from *My Tracks* |
 
 ## Requirements
 
@@ -18,26 +18,54 @@ A set of Python scripts to manage your Tidal music library using the unofficial 
 ## Installation
 
 ```bash
-pip install tidalapi
+pip install -r requirements.txt
 ```
 
 ## Usage
 
-Each script runs independently. The first time you run it, a browser window will open for you to log in to Tidal.
+### Web interface (recommended)
+
+```bash
+python app.py
+```
+
+Then open **http://localhost:5000** in your browser. The interface guides you through the two-stage workflow:
+
+1. **Stage 1 — Import:** select your local music folder and sync it to Tidal My Tracks
+2. **Stage 2 — Optimize:** improve audio quality and remove duplicates directly in Tidal
+
+### Command line
+
+Each script can also be run independently. The first time you run it, a browser window will open for you to log in to Tidal.
 
 ```bash
 # Sync local music to Tidal
-python sincronizar_tidal.py
+python core/sincronizar.py
 
 # Upgrade audio quality of your library
-python mejorar_calidad_tidal.py
+python core/mejorar_calidad.py
 
 # Remove duplicates
-python limpiar_duplicados_tidal.py
+python core/limpiar_duplicados.py
+```
+
+## Project structure
+
+```
+tidal/
+├── app.py                  # Flask web server
+├── requirements.txt
+├── core/                   # Core scripts
+│   ├── sincronizar.py
+│   ├── mejorar_calidad.py
+│   └── limpiar_duplicados.py
+├── static/js/              # Frontend
+├── templates/              # HTML templates
+└── logs/                   # Output logs (git-ignored)
 ```
 
 ## Notes
 
 - Scripts respect a rate limit (`RATE_LIMIT_DELAY`) to avoid overloading the Tidal API.
 - The session file (`tidal-session.json`) stores your authentication locally and is excluded from the repository for security.
-- Result `.txt` files are also excluded from the repository.
+- Result `.txt` log files are saved to `logs/` and excluded from the repository.
