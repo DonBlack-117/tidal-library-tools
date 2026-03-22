@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tidal Library Tools</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            base:     '#0D0D0D',
+            surface:  '#161616',
+            elevated: '#1F1F1F',
+            border:   '#2A2A2A',
+            accent:   '#00D4FF',
+          },
+          fontFamily: {
+            mono: ['JetBrains Mono', 'Fira Code', 'Cascadia Code', 'monospace'],
+          },
+          animation: {
+            'pulse-slow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #1F1F1F; }
+    ::-webkit-scrollbar-thumb { background: #3A3A3A; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #4A4A4A; }
+    .log-line { animation: fadeIn 0.1s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+    .progress-indeterminate {
+      background: linear-gradient(90deg, transparent 0%, #00D4FF 40%, #00D4FF 60%, transparent 100%);
+      background-size: 200% 100%;
+      animation: indeterminate 1.5s linear infinite;
+    }
+    @keyframes indeterminate {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .tool-card { transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s; }
+    .tool-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.4); }
+    .btn-run { transition: all 0.15s; }
+    .btn-run:active { transform: scale(0.97); }
+    .btn-run:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* Pipeline connector between Stage 1 steps */
+    .step-connector {
+      display: flex;
+      align-items: center;
+      color: #3A3A3A;
+      flex-shrink: 0;
+      padding: 0 4px;
+    }
+    /* Stage divider arrow */
+    .stage-divider {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: #3A3A3A;
+      position: relative;
+    }
+    .stage-divider::before,
+    .stage-divider::after {
+      content: '';
+      display: block;
+      width: 1px;
+      height: 18px;
+      background: linear-gradient(to bottom, #2A2A2A, #3A3A3A);
+    }
+  </style>
+</head>
+
+<body class="bg-[#0D0D0D] text-gray-100 min-h-screen">
+
+  <!-- ── Navbar ──────────────────────────────────────────────────── -->
+  <nav class="sticky top-0 z-50 bg-[#0D0D0D]/90 backdrop-blur-sm border-b border-[#2A2A2A] px-6 py-3.5">
+    <div class="max-w-4xl mx-auto flex items-center justify-between">
+
+      <!-- Logo + Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
+          <svg class="w-5 h-5 text-accent" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 3v10.55A4 4 0 1014 17V7h4V3h-6z"/>
+          </svg>
+        </div>
+        <div>
+          <span class="font-semibold tracking-tight">Tidal Library Tools</span>
+          <span class="ml-2 text-xs text-gray-600 font-normal hidden sm:inline">gestión de biblioteca</span>
+        </div>
+      </div>
+
+      <!-- Session status + Exit -->
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2">
+          <div id="session-dot" class="w-2 h-2 rounded-full bg-gray-600 transition-colors duration-500"></div>
+          <span id="session-label" class="text-gray-500 text-xs">Listo</span>
+        </div>
+        <!-- Cierra el servidor Flask y la aplicación -->
+        <button
+          onclick="exitApp()"
+          id="exit-btn"
+          title="Salir de la aplicación"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-gray-600
+                 hover:text-red-400 hover:bg-red-400/10 border border-transparent
+                 hover:border-red-400/20 transition-all">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+          </svg>
+          Salir
+        </button>
+      </div>
+
+    </div>
+  </nav>
+
+  <!-- ── Main Content ────────────────────────────────────────────── -->
+  <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+
+    <!-- ════════════════════════════════════════════════════════
+         ETAPA 1 — Importar música local a Tidal
+         Flujo: Seleccionar carpeta → Sincronizar
+         ════════════════════════════════════════════════════════ -->
+    <section class="rounded-2xl border border-[#00D4FF]/20 bg-[#161616] overflow-hidden">
+
+      <!-- Stage header -->
+      <div class="flex items-center justify-between px-5 py-3.5 border-b border-[#00D4FF]/10 bg-[#00D4FF]/[0.04]">
+        <div class="flex items-center gap-3">
+          <!-- Step badge -->
+          <span class="w-6 h-6 rounded-full bg-[#00D4FF]/15 text-[#00D4FF] text-xs font-bold flex items-center justify-center shrink-0">1</span>
+          <div>
+            <span class="text-sm font-semibold text-gray-200">Importar música local a Tidal</span>
+            <span class="ml-2 text-xs text-gray-600 hidden sm:inline">Busca tus canciones descargadas y agrégalas a My Tracks</span>
+          </div>
+        </div>
+        <!-- Source → destination badge -->
+        <div class="hidden sm:flex items-center gap-1.5 text-xs text-gray-600 bg-[#1F1F1F] px-3 py-1.5 rounded-lg border border-[#2A2A2A]">
+          <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+          </svg>
+          <span>Tu ordenador</span>
+          <svg class="w-3 h-3 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+          </svg>
+          <svg class="w-3.5 h-3.5 text-[#00D4FF]/60" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 3v10.55A4 4 0 1014 17V7h4V3h-6z"/>
+          </svg>
+          <span class="text-[#00D4FF]/60">Tidal</span>
+        </div>
+      </div>
+
+      <!-- Pipeline: Step 1 → Step 2 -->
+      <div class="p-5">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-start gap-3 sm:gap-0">
+
+          <!-- ── Paso 1: Carpeta local ── -->
+          <div class="flex-1 rounded-xl bg-[#1A1A1A] border border-[#2A2A2A] p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-[10px] font-bold text-[#00D4FF]/60 uppercase tracking-widest">Paso 1</span>
+              <div class="h-px flex-1 bg-[#2A2A2A]"></div>
+            </div>
+            <div class="flex items-center gap-2 mb-2">
+              <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+              </svg>
+              <span class="text-xs font-semibold text-gray-300">Selecciona tu carpeta de música</span>
+            </div>
+            <p class="text-[11px] text-gray-600 mb-3 leading-relaxed">
+              La carpeta donde están tus canciones descargadas.<br>
+              Formato esperado: <code class="text-gray-500">Artista - Título.mp3</code>
+            </p>
+            <div class="flex gap-2">
+              <input
+                id="music-dir"
+                type="text"
+                placeholder="C:\Music\Telegram"
+                class="flex-1 min-w-0 bg-[#141414] text-gray-100 rounded-lg px-3 py-2 text-xs
+                       border border-[#333] focus:outline-none focus:border-[#00D4FF]/40
+                       placeholder:text-gray-700 transition-colors"
+              />
+              <!-- Abre el explorador de carpetas nativo del SO -->
+              <button
+                onclick="pickFolder()"
+                id="pick-btn"
+                title="Abrir explorador de carpetas"
+                class="px-2.5 py-2 bg-[#141414] hover:bg-[#222] rounded-lg text-gray-500
+                       hover:text-gray-300 border border-[#333] transition-colors shrink-0"
+                aria-label="Seleccionar carpeta">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+                </svg>
+              </button>
+              <button
+                onclick="saveConfig()"
+                id="save-btn"
+                class="px-3 py-2 bg-[#141414] hover:bg-[#222] rounded-lg text-xs text-gray-500
+                       hover:text-gray-300 border border-[#333] transition-colors whitespace-nowrap">
+                Guardar
+              </button>
+            </div>
+          </div>
+
+          <!-- ── Connector arrow ── -->
+          <div class="step-connector justify-center sm:mt-10">
+            <!-- Vertical on mobile, horizontal on desktop -->
+            <svg class="hidden sm:block w-8 h-5 text-[#333]" fill="none" stroke="currentColor" viewBox="0 0 32 20" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2 10h24m0 0l-6-6m6 6l-6 6"/>
+            </svg>
+            <svg class="sm:hidden w-5 h-8 text-[#333]" fill="none" stroke="currentColor" viewBox="0 0 20 32" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10 2v24m0 0l-6-6m6 6l6-6"/>
+            </svg>
+          </div>
+
+          <!-- ── Paso 2: Sincronizar ── -->
+          <div class="flex-1 rounded-xl bg-[#1A1A1A] border border-[#2A2A2A] p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-[10px] font-bold text-[#00D4FF]/60 uppercase tracking-widest">Paso 2</span>
+              <div class="h-px flex-1 bg-[#2A2A2A]"></div>
+            </div>
+            <div class="flex items-center gap-2 mb-2">
+              <svg class="w-4 h-4 text-[#00D4FF] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+              <span class="text-xs font-semibold text-gray-300">Sincronizar con Tidal</span>
+            </div>
+            <p class="text-[11px] text-gray-600 mb-3 leading-relaxed">
+              Busca cada canción en el catálogo de Tidal y la agrega a tu <em class="text-gray-500 not-italic">My Tracks</em> si aún no la tienes.
+            </p>
+            <button
+              onclick="runTool('sync', this)"
+              class="btn-run w-full py-2.5 bg-[#00D4FF]/10 hover:bg-[#00D4FF]/20 text-[#00D4FF]
+                     rounded-lg text-xs font-semibold transition-colors border border-[#00D4FF]/25
+                     flex items-center justify-center gap-2">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              Iniciar sincronización
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════════════════════════════════════════════════════
+         Divider: flujo visual entre etapas
+         ════════════════════════════════════════════════════════ -->
+    <div class="stage-divider py-1">
+      <div class="flex items-center gap-3 text-xs text-gray-700">
+        <div class="h-px flex-1 bg-[#222]"></div>
+        <div class="flex items-center gap-2 bg-[#161616] border border-[#2A2A2A] rounded-full px-3 py-1">
+          <svg class="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+          </svg>
+          <span>Luego, optimiza tu biblioteca en Tidal</span>
+        </div>
+        <div class="h-px flex-1 bg-[#222]"></div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════
+         ETAPA 2 — Optimización dentro de Tidal
+         Solo opera sobre My Tracks ya sincronizado
+         ════════════════════════════════════════════════════════ -->
+    <section class="rounded-2xl border border-violet-500/20 bg-[#161616] overflow-hidden">
+
+      <!-- Stage header -->
+      <div class="flex items-center justify-between px-5 py-3.5 border-b border-violet-500/10 bg-violet-500/[0.04]">
+        <div class="flex items-center gap-3">
+          <span class="w-6 h-6 rounded-full bg-violet-500/15 text-violet-400 text-xs font-bold flex items-center justify-center shrink-0">2</span>
+          <div>
+            <span class="text-sm font-semibold text-gray-200">Optimizar biblioteca en Tidal</span>
+            <span class="ml-2 text-xs text-gray-600 hidden sm:inline">Opera directamente sobre tus My Tracks en la nube</span>
+          </div>
+        </div>
+        <!-- Tidal-only badge -->
+        <div class="hidden sm:flex items-center gap-1.5 text-xs text-violet-400/60 bg-violet-500/[0.08] px-3 py-1.5 rounded-lg border border-violet-500/15">
+          <svg class="w-3.5 h-3.5 text-[#00D4FF]/50" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 3v10.55A4 4 0 1014 17V7h4V3h-6z"/>
+          </svg>
+          <span>Solo en Tidal · no requiere carpeta local</span>
+        </div>
+      </div>
+
+      <!-- Cards: Mejorar calidad + Limpiar duplicados -->
+      <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+        <!-- Card: Mejorar Calidad -->
+        <div class="tool-card rounded-xl bg-[#1A1A1A] border border-[#2A2A2A] hover:border-violet-500/30 p-4">
+          <div class="flex items-start justify-between mb-3">
+            <div class="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center">
+              <svg class="w-4.5 h-4.5 w-[18px] h-[18px] text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+              </svg>
+            </div>
+            <!-- Quality tiers hint -->
+            <div class="flex flex-col items-end gap-0.5">
+              <span class="text-[9px] text-emerald-400/70 font-semibold tracking-wide">HI-RES</span>
+              <span class="text-[9px] text-emerald-400/50">LOSSLESS</span>
+              <span class="text-[9px] text-gray-700 line-through">HIGH</span>
+            </div>
+          </div>
+          <h3 class="text-sm font-semibold text-gray-200 mb-1">Mejorar Calidad</h3>
+          <p class="text-[11px] text-gray-600 mb-4 leading-relaxed">
+            Para cada canción en My Tracks, busca si existe una versión de mayor calidad (Hi-Res, Lossless) y la reemplaza automáticamente.
+          </p>
+          <button
+            onclick="runTool('quality', this)"
+            class="btn-run w-full py-2.5 bg-violet-500/10 hover:bg-violet-500/20 text-violet-400
+                   rounded-lg text-xs font-semibold transition-colors border border-violet-500/20
+                   flex items-center justify-center gap-2">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Mejorar calidad
+          </button>
+        </div>
+
+        <!-- Card: Limpiar Duplicados -->
+        <div class="tool-card rounded-xl bg-[#1A1A1A] border border-[#2A2A2A] hover:border-violet-500/30 p-4">
+          <div class="flex items-start justify-between mb-3">
+            <div class="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center">
+              <svg class="w-[18px] h-[18px] text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </div>
+            <!-- Dedup hint: keep best, remove copies -->
+            <div class="flex flex-col items-end gap-0.5">
+              <span class="text-[9px] text-emerald-400/70 font-semibold">CONSERVA</span>
+              <span class="text-[9px] text-red-400/50 line-through">copia 1</span>
+              <span class="text-[9px] text-red-400/50 line-through">copia 2</span>
+            </div>
+          </div>
+          <h3 class="text-sm font-semibold text-gray-200 mb-1">Limpiar Duplicados</h3>
+          <p class="text-[11px] text-gray-600 mb-4 leading-relaxed">
+            Escanea My Tracks en busca de canciones repetidas. Conserva la de mayor calidad y elimina las copias extra automáticamente.
+          </p>
+          <button
+            onclick="runTool('dupes', this)"
+            class="btn-run w-full py-2.5 bg-violet-500/10 hover:bg-violet-500/20 text-violet-400
+                   rounded-lg text-xs font-semibold transition-colors border border-violet-500/20
+                   flex items-center justify-center gap-2">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Limpiar duplicados
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Operation Panel (hidden until a tool runs) -->
+    <section id="operation-panel" class="hidden bg-[#161616] rounded-2xl border border-[#2A2A2A] overflow-hidden">
+
+      <!-- Header -->
+      <div class="px-5 pt-5 pb-4 border-b border-[#2A2A2A]">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2.5">
+            <div id="op-icon" class="w-7 h-7 rounded-lg flex items-center justify-center">
+              <!-- Icon injected by JS -->
+            </div>
+            <span id="op-title" class="text-sm font-semibold">Ejecutando...</span>
+          </div>
+          <button
+            id="stop-btn"
+            onclick="stopOperation()"
+            class="text-xs text-gray-600 hover:text-red-400 transition-colors px-2 py-1
+                   rounded-lg hover:bg-red-400/10 hidden">
+            Detener
+          </button>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="h-1 bg-[#1F1F1F] rounded-full overflow-hidden">
+          <div id="progress-bar" class="h-full rounded-full transition-all duration-500"></div>
+        </div>
+        <div class="flex justify-between mt-1.5">
+          <span id="progress-status" class="text-xs text-gray-600">Iniciando...</span>
+          <span id="progress-pct" class="text-xs text-gray-600"></span>
+        </div>
+      </div>
+
+      <!-- Log Terminal -->
+      <div
+        id="log-output"
+        class="font-mono text-[11px] leading-relaxed text-gray-400 bg-black/30
+               px-5 py-4 h-72 overflow-y-auto"
+      ></div>
+
+      <!-- Summary (hidden until done) -->
+      <div id="summary" class="hidden px-5 py-4 border-t border-[#2A2A2A]">
+        <div id="summary-content" class="flex flex-wrap gap-3"></div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ── Footer ─────────────────────────────────────────────────── -->
+  <footer class="text-center py-6 text-xs text-gray-700">
+    Tidal Library Tools &mdash; corre localmente en tu máquina
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

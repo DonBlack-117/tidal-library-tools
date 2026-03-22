@@ -16,7 +16,8 @@ tidal-session.json
 *.session.json
 
 # Archivos de log y resultados locales
-*.txt
+logs/*.txt
+!logs/.gitkeep
 
 # IDEs
 .vscode/

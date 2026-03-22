@@ -516,9 +516,11 @@ def main():
 
     if all_removed:
         try:
-            with open(LOG_ELIMINADOS, "a", encoding="utf-8") as f:
+            logs_dir = Path(__file__).parent.parent / "logs"
+            logs_dir.mkdir(exist_ok=True)
+            with open(logs_dir / LOG_ELIMINADOS, "a", encoding="utf-8") as f:
                 f.write("\n".join(all_removed) + "\n")
-            print(f"\n  💾 Log guardado en: {LOG_ELIMINADOS}")
+            print(f"\n  💾 Log guardado en: logs/{LOG_ELIMINADOS}")
         except Exception:
             pass
 
