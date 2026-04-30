@@ -27,31 +27,140 @@
     }
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Inter', sans-serif; }
+
+    /* ── Scrollbar ── */
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: #1F1F1F; }
     ::-webkit-scrollbar-thumb { background: #3A3A3A; border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: #4A4A4A; }
+
+    /* ── Background ambient orbs ── */
+    .bg-orb {
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .bg-orb-1 {
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(0,212,255,0.07) 0%, transparent 65%);
+      top: -200px; right: -200px;
+      filter: blur(80px);
+      animation: orb-a 20s ease-in-out infinite;
+    }
+    .bg-orb-2 {
+      width: 550px; height: 550px;
+      background: radial-gradient(circle, rgba(139,92,246,0.07) 0%, transparent 65%);
+      bottom: 50px; left: -200px;
+      filter: blur(80px);
+      animation: orb-b 25s ease-in-out infinite;
+    }
+    .bg-orb-3 {
+      width: 350px; height: 350px;
+      background: radial-gradient(circle, rgba(0,212,255,0.04) 0%, transparent 65%);
+      top: 60%; right: 5%;
+      filter: blur(60px);
+      animation: orb-a 16s ease-in-out infinite reverse;
+    }
+    @keyframes orb-a {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33%       { transform: translate(-45px, 30px) scale(1.06); }
+      66%       { transform: translate(20px, -20px) scale(0.94); }
+    }
+    @keyframes orb-b {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50%       { transform: translate(40px, -30px) scale(1.08); }
+    }
+
+    /* ── Log lines ── */
     .log-line { animation: fadeIn 0.1s ease-in; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+
+    /* ── Progress bar ── */
     .progress-indeterminate {
-      background: linear-gradient(90deg, transparent 0%, #00D4FF 40%, #00D4FF 60%, transparent 100%);
+      background: linear-gradient(90deg, transparent 0%, #00D4FF 35%, #7c3aed 65%, transparent 100%);
       background-size: 200% 100%;
-      animation: indeterminate 1.5s linear infinite;
+      animation: indeterminate 1.8s ease-in-out infinite;
+      box-shadow: 0 0 14px rgba(0,212,255,0.7), 0 0 30px rgba(0,212,255,0.25);
     }
     @keyframes indeterminate {
       0%   { background-position: 200% 0; }
       100% { background-position: -200% 0; }
     }
-    .tool-card { transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s; }
-    .tool-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.4); }
-    .btn-run { transition: all 0.15s; }
-    .btn-run:active { transform: scale(0.97); }
-    .btn-run:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
-    /* Pipeline connector between Stage 1 steps */
+    /* ── Tool cards ── */
+    .tool-card {
+      transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+      position: relative;
+      overflow: hidden;
+    }
+    .tool-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(139,92,246,0.04) 0%, transparent 60%);
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    .tool-card:hover::before { opacity: 1; }
+    .tool-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5), 0 0 30px rgba(139,92,246,0.12);
+    }
+
+    /* ── Buttons ── */
+    .btn-run {
+      transition: all 0.18s;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-run::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -120%;
+      width: 55%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+      transform: skewX(-20deg);
+    }
+    .btn-run:not(:disabled):hover::after {
+      animation: shimmer-sweep 0.55s ease forwards;
+    }
+    .btn-run:not(:disabled):hover { filter: brightness(1.12); }
+    .btn-run:active { transform: scale(0.97); }
+    .btn-run:disabled { opacity: 0.4; cursor: not-allowed; transform: none; filter: none; }
+    @keyframes shimmer-sweep {
+      from { left: -120%; }
+      to   { left: 160%; }
+    }
+
+    /* ── Waveform bars ── */
+    .wave-bars {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      height: 16px;
+    }
+    .wave-bar {
+      width: 2px;
+      border-radius: 2px;
+      background: currentColor;
+      animation: wave-bounce var(--dur) ease-in-out var(--delay) infinite;
+    }
+    .wave-bar:nth-child(1) { --dur: 0.80s; --delay: 0.00s; }
+    .wave-bar:nth-child(2) { --dur: 1.10s; --delay: 0.12s; }
+    .wave-bar:nth-child(3) { --dur: 0.70s; --delay: 0.24s; }
+    .wave-bar:nth-child(4) { --dur: 1.00s; --delay: 0.08s; }
+    .wave-bar:nth-child(5) { --dur: 0.90s; --delay: 0.18s; }
+    @keyframes wave-bounce {
+      0%, 100% { height: 3px;  opacity: 0.35; }
+      50%       { height: 14px; opacity: 0.9;  }
+    }
+
+    /* ── Pipeline connector ── */
     .step-connector {
       display: flex;
       align-items: center;
@@ -59,52 +168,171 @@
       flex-shrink: 0;
       padding: 0 4px;
     }
-    /* Stage divider arrow */
+
+    /* ── Stage divider ── */
     .stage-divider {
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 4px;
-      color: #3A3A3A;
       position: relative;
     }
-    .stage-divider::before,
-    .stage-divider::after {
+    .stage-divider::before, .stage-divider::after {
       content: '';
       display: block;
       width: 1px;
       height: 18px;
       background: linear-gradient(to bottom, #2A2A2A, #3A3A3A);
     }
+
+    /* ── Gradient text ── */
+    .text-grad-cyan {
+      background: linear-gradient(90deg, #00D4FF 0%, #7ff6ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .text-grad-violet {
+      background: linear-gradient(90deg, #a78bfa 0%, #c4b5fd 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* ── Section hover glow ── */
+    .section-cyan  { transition: box-shadow 0.35s; }
+    .section-cyan:hover  { box-shadow: 0 0 0 1px rgba(0,212,255,0.12), 0 24px 70px rgba(0,0,0,0.3); }
+    .section-violet { transition: box-shadow 0.35s; }
+    .section-violet:hover { box-shadow: 0 0 0 1px rgba(139,92,246,0.12), 0 24px 70px rgba(0,0,0,0.3); }
+
+    /* ── Step badge glow on section hover ── */
+    .badge-cyan, .badge-violet { transition: box-shadow 0.3s; }
+    .section-cyan:hover  .badge-cyan   { box-shadow: 0 0 14px rgba(0,212,255,0.5); }
+    .section-violet:hover .badge-violet { box-shadow: 0 0 14px rgba(139,92,246,0.5); }
+
+    /* ── Entrance animations ── */
+    .fade-up {
+      opacity: 0;
+      animation: fade-up-in 0.5s ease-out forwards;
+    }
+    .d1 { animation-delay: 0.05s; }
+    .d2 { animation-delay: 0.18s; }
+    .d3 { animation-delay: 0.30s; }
+    @keyframes fade-up-in {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Operation panel entrance ── */
+    #operation-panel:not(.hidden) {
+      animation: panel-appear 0.4s ease-out;
+    }
+    @keyframes panel-appear {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Log terminal scanlines ── */
+    #log-output { position: relative; }
+    #log-output::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 3px,
+        rgba(0,0,0,0.04) 3px, rgba(0,0,0,0.04) 4px
+      );
+      pointer-events: none;
+    }
+
+    /* ── Summary chip entrance ── */
+    #summary-content > div {
+      animation: chip-pop 0.28s ease-out both;
+    }
+    #summary-content > div:nth-child(1) { animation-delay: 0.00s; }
+    #summary-content > div:nth-child(2) { animation-delay: 0.06s; }
+    #summary-content > div:nth-child(3) { animation-delay: 0.12s; }
+    #summary-content > div:nth-child(4) { animation-delay: 0.18s; }
+    #summary-content > div:nth-child(5) { animation-delay: 0.24s; }
+    @keyframes chip-pop {
+      from { opacity: 0; transform: scale(0.82) translateY(5px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    /* ── Navbar logo glow ── */
+    .logo-icon {
+      box-shadow: 0 0 16px rgba(0,212,255,0.22), inset 0 0 12px rgba(0,212,255,0.06);
+      transition: box-shadow 0.3s;
+    }
+    .logo-icon:hover {
+      box-shadow: 0 0 28px rgba(0,212,255,0.4), inset 0 0 16px rgba(0,212,255,0.1);
+    }
+
+    /* ── Session dot glow ── */
+    .dot-ok      { box-shadow: 0 0 8px rgba(52,211,153,0.7); }
+    .dot-loading { box-shadow: 0 0 8px rgba(251,191,36,0.7); }
+    .dot-error   { box-shadow: 0 0 8px rgba(248,113,113,0.7); }
+
+    /* ── Input focus glow ── */
+    #music-dir:focus {
+      box-shadow: 0 0 0 2px rgba(0,212,255,0.18);
+    }
+
+    /* ── Sky (Stage 3) ── */
+    .section-sky { transition: box-shadow 0.35s; }
+    .section-sky:hover { box-shadow: 0 0 0 1px rgba(14,165,233,0.12), 0 24px 70px rgba(0,0,0,0.3); }
+    .badge-sky { transition: box-shadow 0.3s; }
+    .section-sky:hover .badge-sky { box-shadow: 0 0 14px rgba(14,165,233,0.5); }
+    .text-grad-sky {
+      background: linear-gradient(90deg, #38bdf8 0%, #7dd3fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    #download-dir:focus, #tidal-url:focus {
+      box-shadow: 0 0 0 2px rgba(14,165,233,0.18);
+    }
   </style>
 </head>
 
-<body class="bg-[#0D0D0D] text-gray-100 min-h-screen">
+<body class="bg-[#0D0D0D] text-gray-100 min-h-screen overflow-x-hidden">
 
-  <!-- ── Navbar ──────────────────────────────────────────────────── -->
-  <nav class="sticky top-0 z-50 bg-[#0D0D0D]/90 backdrop-blur-sm border-b border-[#2A2A2A] px-6 py-3.5">
+  <!-- ── Ambient background orbs ── -->
+  <div class="bg-orb bg-orb-1" aria-hidden="true"></div>
+  <div class="bg-orb bg-orb-2" aria-hidden="true"></div>
+  <div class="bg-orb bg-orb-3" aria-hidden="true"></div>
+
+  <!-- ── Navbar ── -->
+  <nav class="sticky top-0 z-50 bg-[#0D0D0D]/85 backdrop-blur-md border-b border-[#2A2A2A]/80 px-6 py-3.5">
     <div class="max-w-4xl mx-auto flex items-center justify-between">
 
       <!-- Logo + Title -->
       <div class="flex items-center gap-3">
-        <div class="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
-          <svg class="w-5 h-5 text-accent" fill="currentColor" viewBox="0 0 24 24">
+        <div class="logo-icon w-8 h-8 rounded-lg bg-[#00D4FF]/10 border border-[#00D4FF]/25 flex items-center justify-center shrink-0">
+          <svg class="w-5 h-5 text-[#00D4FF]" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 3v10.55A4 4 0 1014 17V7h4V3h-6z"/>
           </svg>
         </div>
-        <div>
-          <span class="font-semibold tracking-tight">Tidal Library Tools</span>
-          <span class="ml-2 text-xs text-gray-600 font-normal hidden sm:inline">gestión de biblioteca</span>
+        <div class="flex items-center gap-3">
+          <span class="font-semibold tracking-tight text-grad-cyan">Tidal Library Tools</span>
+          <!-- Animated waveform bars -->
+          <div class="wave-bars text-[#00D4FF]/50 hidden sm:flex" aria-hidden="true">
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+          </div>
+          <span class="text-xs text-gray-600 font-normal hidden sm:inline">gestión de biblioteca</span>
         </div>
       </div>
 
       <!-- Session status + Exit -->
       <div class="flex items-center gap-4">
         <div class="flex items-center gap-2">
-          <div id="session-dot" class="w-2 h-2 rounded-full bg-gray-600 transition-colors duration-500"></div>
+          <div id="session-dot" class="w-2 h-2 rounded-full bg-gray-600 transition-all duration-500"></div>
           <span id="session-label" class="text-gray-500 text-xs">Listo</span>
         </div>
-        <!-- Cierra el servidor Flask y la aplicación -->
         <button
           onclick="exitApp()"
           id="exit-btn"
@@ -123,22 +351,25 @@
     </div>
   </nav>
 
-  <!-- ── Main Content ────────────────────────────────────────────── -->
-  <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+  <!-- ── Main Content ── -->
+  <main class="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <div class="lg:grid lg:grid-cols-[2fr_3fr] lg:gap-8 lg:items-start">
+
+    <!-- ══ LEFT: controles y etapas ══════════════════════════════════ -->
+    <div class="space-y-6">
 
     <!-- ════════════════════════════════════════════════════════
          ETAPA 1 — Importar música local a Tidal
-         Flujo: Seleccionar carpeta → Sincronizar
          ════════════════════════════════════════════════════════ -->
-    <section class="rounded-2xl border border-[#00D4FF]/20 bg-[#161616] overflow-hidden">
+    <section class="section-cyan fade-up d1 rounded-2xl border border-[#00D4FF]/20 bg-[#161616] overflow-hidden">
 
       <!-- Stage header -->
-      <div class="flex items-center justify-between px-5 py-3.5 border-b border-[#00D4FF]/10 bg-[#00D4FF]/[0.04]">
+      <div class="flex items-center justify-between px-5 py-3.5 border-b border-[#00D4FF]/10 bg-gradient-to-r from-[#00D4FF]/[0.07] via-[#00D4FF]/[0.03] to-transparent">
         <div class="flex items-center gap-3">
-          <!-- Step badge -->
-          <span class="w-6 h-6 rounded-full bg-[#00D4FF]/15 text-[#00D4FF] text-xs font-bold flex items-center justify-center shrink-0">1</span>
+          <span class="badge-cyan w-6 h-6 rounded-full bg-[#00D4FF]/15 text-[#00D4FF] text-xs font-bold flex items-center justify-center shrink-0">1</span>
           <div>
-            <span class="text-sm font-semibold text-gray-200">Importar música local a Tidal</span>
+            <span class="text-sm font-semibold text-grad-cyan">Importar música local a Tidal</span>
             <span class="ml-2 text-xs text-gray-600 hidden sm:inline">Busca tus canciones descargadas y agrégalas a My Tracks</span>
           </div>
         </div>
@@ -163,7 +394,7 @@
         <div class="flex flex-col sm:flex-row items-stretch sm:items-start gap-3 sm:gap-0">
 
           <!-- ── Paso 1: Carpeta local ── -->
-          <div class="flex-1 rounded-xl bg-[#1A1A1A] border border-[#2A2A2A] p-4">
+          <div class="flex-1 rounded-xl bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#00D4FF]/20 p-4 transition-colors">
             <div class="flex items-center gap-2 mb-3">
               <span class="text-[10px] font-bold text-[#00D4FF]/60 uppercase tracking-widest">Paso 1</span>
               <div class="h-px flex-1 bg-[#2A2A2A]"></div>
@@ -176,7 +407,7 @@
             </div>
             <p class="text-[11px] text-gray-600 mb-3 leading-relaxed">
               La carpeta donde están tus canciones descargadas.<br>
-              Formato esperado: <code class="text-gray-500">Artista - Título.mp3</code>
+              Formato esperado: <code class="text-gray-500 font-mono">Artista - Título.mp3</code>
             </p>
             <div class="flex gap-2">
               <input
@@ -185,15 +416,15 @@
                 placeholder="C:\Music\Telegram"
                 class="flex-1 min-w-0 bg-[#141414] text-gray-100 rounded-lg px-3 py-2 text-xs
                        border border-[#333] focus:outline-none focus:border-[#00D4FF]/40
-                       placeholder:text-gray-700 transition-colors"
+                       placeholder:text-gray-700 transition-all"
               />
-              <!-- Abre el explorador de carpetas nativo del SO -->
               <button
                 onclick="pickFolder()"
                 id="pick-btn"
                 title="Abrir explorador de carpetas"
-                class="px-2.5 py-2 bg-[#141414] hover:bg-[#222] rounded-lg text-gray-500
-                       hover:text-gray-300 border border-[#333] transition-colors shrink-0"
+                class="px-2.5 py-2 bg-[#141414] hover:bg-[#1E1E1E] rounded-lg text-gray-500
+                       hover:text-[#00D4FF] border border-[#333] hover:border-[#00D4FF]/30
+                       transition-all shrink-0"
                 aria-label="Seleccionar carpeta">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
@@ -202,8 +433,9 @@
               <button
                 onclick="saveConfig()"
                 id="save-btn"
-                class="px-3 py-2 bg-[#141414] hover:bg-[#222] rounded-lg text-xs text-gray-500
-                       hover:text-gray-300 border border-[#333] transition-colors whitespace-nowrap">
+                class="px-3 py-2 bg-[#141414] hover:bg-[#1E1E1E] rounded-lg text-xs text-gray-500
+                       hover:text-[#00D4FF] border border-[#333] hover:border-[#00D4FF]/30
+                       transition-all whitespace-nowrap">
                 Guardar
               </button>
             </div>
@@ -211,7 +443,6 @@
 
           <!-- ── Connector arrow ── -->
           <div class="step-connector justify-center sm:mt-10">
-            <!-- Vertical on mobile, horizontal on desktop -->
             <svg class="hidden sm:block w-8 h-5 text-[#333]" fill="none" stroke="currentColor" viewBox="0 0 32 20" stroke-width="1.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M2 10h24m0 0l-6-6m6 6l-6 6"/>
             </svg>
@@ -221,7 +452,7 @@
           </div>
 
           <!-- ── Paso 2: Sincronizar ── -->
-          <div class="flex-1 rounded-xl bg-[#1A1A1A] border border-[#2A2A2A] p-4">
+          <div class="flex-1 rounded-xl bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#00D4FF]/20 p-4 transition-colors">
             <div class="flex items-center gap-2 mb-3">
               <span class="text-[10px] font-bold text-[#00D4FF]/60 uppercase tracking-widest">Paso 2</span>
               <div class="h-px flex-1 bg-[#2A2A2A]"></div>
@@ -238,8 +469,9 @@
             <button
               onclick="runTool('sync', this)"
               class="btn-run w-full py-2.5 bg-[#00D4FF]/10 hover:bg-[#00D4FF]/20 text-[#00D4FF]
-                     rounded-lg text-xs font-semibold transition-colors border border-[#00D4FF]/25
-                     flex items-center justify-center gap-2">
+                     rounded-lg text-xs font-semibold border border-[#00D4FF]/25
+                     hover:border-[#00D4FF]/50 hover:shadow-[0_0_22px_rgba(0,212,255,0.18)]
+                     flex items-center justify-center gap-2 transition-all">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -253,37 +485,35 @@
     </section>
 
     <!-- ════════════════════════════════════════════════════════
-         Divider: flujo visual entre etapas
+         Divider entre etapas
          ════════════════════════════════════════════════════════ -->
-    <div class="stage-divider py-1">
+    <div class="stage-divider py-1 fade-up d2">
       <div class="flex items-center gap-3 text-xs text-gray-700">
-        <div class="h-px flex-1 bg-[#222]"></div>
-        <div class="flex items-center gap-2 bg-[#161616] border border-[#2A2A2A] rounded-full px-3 py-1">
+        <div class="h-px flex-1 bg-gradient-to-r from-transparent via-[#222] to-[#222]"></div>
+        <div class="flex items-center gap-2 bg-[#161616] border border-[#2A2A2A] rounded-full px-4 py-1.5 hover:border-[#333] transition-colors cursor-default">
           <svg class="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
           </svg>
-          <span>Luego, optimiza tu biblioteca en Tidal</span>
+          <span class="text-gray-600">Luego, optimiza tu biblioteca en Tidal</span>
         </div>
-        <div class="h-px flex-1 bg-[#222]"></div>
+        <div class="h-px flex-1 bg-gradient-to-l from-transparent via-[#222] to-[#222]"></div>
       </div>
     </div>
 
     <!-- ════════════════════════════════════════════════════════
          ETAPA 2 — Optimización dentro de Tidal
-         Solo opera sobre My Tracks ya sincronizado
          ════════════════════════════════════════════════════════ -->
-    <section class="rounded-2xl border border-violet-500/20 bg-[#161616] overflow-hidden">
+    <section class="section-violet fade-up d3 rounded-2xl border border-violet-500/20 bg-[#161616] overflow-hidden">
 
       <!-- Stage header -->
-      <div class="flex items-center justify-between px-5 py-3.5 border-b border-violet-500/10 bg-violet-500/[0.04]">
+      <div class="flex items-center justify-between px-5 py-3.5 border-b border-violet-500/10 bg-gradient-to-r from-violet-500/[0.07] via-violet-500/[0.03] to-transparent">
         <div class="flex items-center gap-3">
-          <span class="w-6 h-6 rounded-full bg-violet-500/15 text-violet-400 text-xs font-bold flex items-center justify-center shrink-0">2</span>
+          <span class="badge-violet w-6 h-6 rounded-full bg-violet-500/15 text-violet-400 text-xs font-bold flex items-center justify-center shrink-0">2</span>
           <div>
-            <span class="text-sm font-semibold text-gray-200">Optimizar biblioteca en Tidal</span>
+            <span class="text-sm font-semibold text-grad-violet">Optimizar biblioteca en Tidal</span>
             <span class="ml-2 text-xs text-gray-600 hidden sm:inline">Opera directamente sobre tus My Tracks en la nube</span>
           </div>
         </div>
-        <!-- Tidal-only badge -->
         <div class="hidden sm:flex items-center gap-1.5 text-xs text-violet-400/60 bg-violet-500/[0.08] px-3 py-1.5 rounded-lg border border-violet-500/15">
           <svg class="w-3.5 h-3.5 text-[#00D4FF]/50" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 3v10.55A4 4 0 1014 17V7h4V3h-6z"/>
@@ -298,14 +528,13 @@
         <!-- Card: Mejorar Calidad -->
         <div class="tool-card rounded-xl bg-[#1A1A1A] border border-[#2A2A2A] hover:border-violet-500/30 p-4">
           <div class="flex items-start justify-between mb-3">
-            <div class="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center">
-              <svg class="w-4.5 h-4.5 w-[18px] h-[18px] text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <div class="w-9 h-9 rounded-xl bg-violet-500/10 border border-violet-500/[0.12] flex items-center justify-center">
+              <svg class="w-[18px] h-[18px] text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
               </svg>
             </div>
-            <!-- Quality tiers hint -->
             <div class="flex flex-col items-end gap-0.5">
-              <span class="text-[9px] text-emerald-400/70 font-semibold tracking-wide">HI-RES</span>
+              <span class="text-[9px] text-emerald-400/80 font-bold tracking-wide bg-emerald-500/10 border border-emerald-500/15 px-1.5 py-0.5 rounded">HI-RES</span>
               <span class="text-[9px] text-emerald-400/50">LOSSLESS</span>
               <span class="text-[9px] text-gray-700 line-through">HIGH</span>
             </div>
@@ -317,8 +546,9 @@
           <button
             onclick="runTool('quality', this)"
             class="btn-run w-full py-2.5 bg-violet-500/10 hover:bg-violet-500/20 text-violet-400
-                   rounded-lg text-xs font-semibold transition-colors border border-violet-500/20
-                   flex items-center justify-center gap-2">
+                   rounded-lg text-xs font-semibold border border-violet-500/20
+                   hover:border-violet-500/45 hover:shadow-[0_0_22px_rgba(139,92,246,0.18)]
+                   flex items-center justify-center gap-2 transition-all">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
               <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -330,14 +560,13 @@
         <!-- Card: Limpiar Duplicados -->
         <div class="tool-card rounded-xl bg-[#1A1A1A] border border-[#2A2A2A] hover:border-violet-500/30 p-4">
           <div class="flex items-start justify-between mb-3">
-            <div class="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center">
+            <div class="w-9 h-9 rounded-xl bg-violet-500/10 border border-violet-500/[0.12] flex items-center justify-center">
               <svg class="w-[18px] h-[18px] text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
               </svg>
             </div>
-            <!-- Dedup hint: keep best, remove copies -->
             <div class="flex flex-col items-end gap-0.5">
-              <span class="text-[9px] text-emerald-400/70 font-semibold">CONSERVA</span>
+              <span class="text-[9px] text-emerald-400/80 font-bold bg-emerald-500/10 border border-emerald-500/15 px-1.5 py-0.5 rounded">CONSERVA</span>
               <span class="text-[9px] text-red-400/50 line-through">copia 1</span>
               <span class="text-[9px] text-red-400/50 line-through">copia 2</span>
             </div>
@@ -349,8 +578,9 @@
           <button
             onclick="runTool('dupes', this)"
             class="btn-run w-full py-2.5 bg-violet-500/10 hover:bg-violet-500/20 text-violet-400
-                   rounded-lg text-xs font-semibold transition-colors border border-violet-500/20
-                   flex items-center justify-center gap-2">
+                   rounded-lg text-xs font-semibold border border-violet-500/20
+                   hover:border-violet-500/45 hover:shadow-[0_0_22px_rgba(139,92,246,0.18)]
+                   flex items-center justify-center gap-2 transition-all">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
               <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -362,8 +592,187 @@
       </div>
     </section>
 
-    <!-- Operation Panel (hidden until a tool runs) -->
-    <section id="operation-panel" class="hidden bg-[#161616] rounded-2xl border border-[#2A2A2A] overflow-hidden">
+    <!-- ════════════════════════════════════════════════════════
+         Divider 2→3
+         ════════════════════════════════════════════════════════ -->
+    <div class="stage-divider py-1 fade-up" style="animation-delay:0.40s">
+      <div class="flex items-center gap-3 text-xs text-gray-700">
+        <div class="h-px flex-1 bg-gradient-to-r from-transparent via-[#222] to-[#222]"></div>
+        <div class="flex items-center gap-2 bg-[#161616] border border-[#2A2A2A] rounded-full px-4 py-1.5 hover:border-[#333] transition-colors cursor-default">
+          <svg class="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+          </svg>
+          <span class="text-gray-600">O descarga directamente de Tidal</span>
+        </div>
+        <div class="h-px flex-1 bg-gradient-to-l from-transparent via-[#222] to-[#222]"></div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════
+         ETAPA 3 — Descargar de Tidal (tiddl)
+         ════════════════════════════════════════════════════════ -->
+    <section class="section-sky fade-up rounded-2xl border border-sky-500/20 bg-[#161616] overflow-hidden" style="animation-delay:0.52s">
+
+      <!-- Stage header -->
+      <div class="flex items-center justify-between px-5 py-3.5 border-b border-sky-500/10 bg-gradient-to-r from-sky-500/[0.07] via-sky-500/[0.03] to-transparent">
+        <div class="flex items-center gap-3">
+          <span class="badge-sky w-6 h-6 rounded-full bg-sky-500/15 text-sky-400 text-xs font-bold flex items-center justify-center shrink-0">3</span>
+          <div>
+            <span class="text-sm font-semibold text-grad-sky">Descargar de Tidal</span>
+            <span class="ml-2 text-xs text-gray-600 hidden sm:inline">Tracks, álbumes, playlists o artistas completos · requiere tiddl</span>
+          </div>
+        </div>
+        <!-- tiddl auth status badge (populated by JS) -->
+        <div id="tiddl-status" class="hidden sm:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border opacity-0 transition-opacity duration-700"></div>
+      </div>
+
+      <div class="p-5 space-y-3">
+
+        <!-- URL input -->
+        <div>
+          <label class="text-[10px] font-bold text-sky-400/60 uppercase tracking-widest mb-1.5 block">URL o ID de Tidal</label>
+          <input
+            id="tidal-url"
+            type="text"
+            placeholder="https://listen.tidal.com/album/123  o  playlist/456  o  78910"
+            class="w-full bg-[#141414] text-gray-100 rounded-lg px-3 py-2 text-xs
+                   border border-[#333] focus:outline-none focus:border-sky-500/40
+                   placeholder:text-gray-700 transition-all"
+          />
+          <p class="text-[10px] text-gray-700 mt-1.5">
+            Acepta: <span class="text-gray-600">track, album, playlist, artist, mix</span> — URL completa o shorthand como <code class="text-gray-500">album/123456</code>
+          </p>
+        </div>
+
+        <!-- Output dir + Quality -->
+        <div class="flex flex-col sm:flex-row gap-3">
+          <div class="flex-1">
+            <label class="text-[10px] font-bold text-sky-400/60 uppercase tracking-widest mb-1.5 block">Carpeta de destino</label>
+            <div class="flex gap-2">
+              <input
+                id="download-dir"
+                type="text"
+                placeholder="C:\Music\Tidal  (vacío = carpeta por defecto de tiddl)"
+                class="flex-1 bg-[#141414] text-gray-100 rounded-lg px-3 py-2 text-xs
+                       border border-[#333] focus:outline-none focus:border-sky-500/40
+                       placeholder:text-gray-700 transition-all"
+              />
+              <button
+                onclick="pickDownloadFolder()"
+                title="Abrir explorador de carpetas"
+                class="px-2.5 py-2 bg-[#141414] hover:bg-[#1E1E1E] rounded-lg text-gray-500
+                       hover:text-sky-400 border border-[#333] hover:border-sky-500/30
+                       transition-all shrink-0"
+                aria-label="Seleccionar carpeta de destino">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="flex flex-col gap-3 sm:w-44">
+            <div>
+              <label class="text-[10px] font-bold text-sky-400/60 uppercase tracking-widest mb-1.5 block">Calidad de audio</label>
+              <select
+                id="dl-quality"
+                class="w-full bg-[#141414] text-gray-100 rounded-lg px-3 py-2 text-xs
+                       border border-[#333] focus:outline-none focus:border-sky-500/40 transition-all">
+                <option value="AUTO" selected>auto — detecta por tipo de URL</option>
+                <option value="MAX">max — Hi-Res 24-bit FLAC</option>
+                <option value="HIGH">high — Lossless 16-bit FLAC</option>
+                <option value="NORMAL">normal — 320 kbps AAC</option>
+                <option value="LOW">low — 96 kbps AAC</option>
+              </select>
+            </div>
+            <label class="flex items-center gap-2.5 cursor-pointer select-none group">
+              <div class="relative">
+                <input id="dl-cover" type="checkbox" checked class="sr-only peer">
+                <div class="w-8 h-4 rounded-full bg-[#2A2A2A] border border-[#333]
+                            peer-checked:bg-sky-500/30 peer-checked:border-sky-500/50 transition-all"></div>
+                <div class="absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-gray-600
+                            peer-checked:bg-sky-400 peer-checked:translate-x-4 transition-all"></div>
+              </div>
+              <span class="text-[11px] text-gray-500 group-hover:text-gray-400 transition-colors">Descargar carátula</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Requisitos notice -->
+        <div class="flex items-start gap-2.5 bg-[#1A1A1A] border border-[#2A2A2A] rounded-xl px-3 py-2.5">
+          <svg class="w-3.5 h-3.5 text-amber-400/50 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <p class="text-[10px] text-gray-600 leading-relaxed">
+            Requiere <code class="text-gray-500">pip install tiddl</code> (Python 3.13+),
+            autenticación con <code class="text-gray-500">tiddl auth login</code>
+            y <span class="text-gray-500">FFmpeg</span> instalado en el sistema.
+          </p>
+        </div>
+
+        <button
+          onclick="runDownload(this)"
+          class="btn-run w-full py-2.5 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400
+                 rounded-lg text-xs font-semibold border border-sky-500/20
+                 hover:border-sky-500/45 hover:shadow-[0_0_22px_rgba(14,165,233,0.18)]
+                 flex items-center justify-center gap-2 transition-all">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          Iniciar descarga
+        </button>
+
+      </div>
+    </section>
+
+    </div><!-- /LEFT -->
+
+    <!-- ══ RIGHT: panel de operaciones ══════════════════════════════ -->
+    <div class="mt-6 lg:mt-0 lg:sticky lg:top-[72px]">
+
+    <!-- ── Operation Panel ── -->
+    <section id="operation-panel" class="hidden lg:!block bg-[#161616] rounded-2xl border border-[#2A2A2A] overflow-hidden">
+
+      <!-- Idle state — visible cuando no hay ninguna herramienta corriendo -->
+      <div id="op-idle" class="flex flex-col items-center justify-center py-16 px-6 text-center select-none">
+        <div class="relative mb-7">
+          <div class="w-16 h-16 rounded-2xl bg-[#1A1A1A] border border-[#2A2A2A] flex items-center justify-center">
+            <svg class="w-8 h-8 text-gray-700" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 3v10.55A4 4 0 1014 17V7h4V3h-6z"/>
+            </svg>
+          </div>
+          <div class="wave-bars text-gray-700/50 absolute -bottom-5 left-1/2 -translate-x-1/2" aria-hidden="true">
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+          </div>
+        </div>
+        <p class="text-sm font-medium text-gray-600 mt-2">Panel de operaciones</p>
+        <p class="text-xs text-gray-700 mt-2 max-w-xs leading-relaxed">
+          Ejecuta una herramienta de la izquierda para ver la salida aquí
+        </p>
+        <div class="flex items-center gap-2 mt-7">
+          <span class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1A1A1A] border border-[#2A2A2A] text-[10px] text-gray-700">
+            <span class="w-3.5 h-3.5 rounded-full bg-[#00D4FF]/10 text-[#00D4FF]/60 text-[8px] font-bold flex items-center justify-center shrink-0">1</span>
+            Importar
+          </span>
+          <svg class="w-3 h-3 text-[#2A2A2A] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+          </svg>
+          <span class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1A1A1A] border border-[#2A2A2A] text-[10px] text-gray-700">
+            <span class="w-3.5 h-3.5 rounded-full bg-violet-500/10 text-violet-400/60 text-[8px] font-bold flex items-center justify-center shrink-0">2</span>
+            Optimizar
+          </span>
+          <svg class="w-3 h-3 text-[#2A2A2A] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+          </svg>
+          <span class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1A1A1A] border border-[#2A2A2A] text-[10px] text-gray-700">
+            <span class="w-3.5 h-3.5 rounded-full bg-sky-500/10 text-sky-400/60 text-[8px] font-bold flex items-center justify-center shrink-0">3</span>
+            Descargar
+          </span>
+        </div>
+      </div>
 
       <!-- Header -->
       <div class="px-5 pt-5 pb-4 border-b border-[#2A2A2A]">
@@ -384,7 +793,7 @@
         </div>
 
         <!-- Progress bar -->
-        <div class="h-1 bg-[#1F1F1F] rounded-full overflow-hidden">
+        <div class="h-1.5 bg-[#1F1F1F] rounded-full overflow-hidden">
           <div id="progress-bar" class="h-full rounded-full transition-all duration-500"></div>
         </div>
         <div class="flex justify-between mt-1.5">
@@ -396,8 +805,8 @@
       <!-- Log Terminal -->
       <div
         id="log-output"
-        class="font-mono text-[11px] leading-relaxed text-gray-400 bg-black/30
-               px-5 py-4 h-72 overflow-y-auto"
+        class="font-mono text-[11px] leading-relaxed text-gray-400 bg-black/40
+               px-5 py-4 h-72 lg:h-[460px] overflow-y-auto"
       ></div>
 
       <!-- Summary (hidden until done) -->
@@ -406,11 +815,15 @@
       </div>
 
     </section>
+    </div><!-- /RIGHT -->
+
+    </div><!-- /grid -->
 
   </main>
 
-  <!-- ── Footer ─────────────────────────────────────────────────── -->
-  <footer class="text-center py-6 text-xs text-gray-700">
+  <!-- ── Footer ── -->
+  <footer class="relative z-10 text-center py-8 text-xs text-gray-700">
+    <div class="w-20 h-px bg-gradient-to-r from-transparent via-[#2A2A2A] to-transparent mx-auto mb-4"></div>
     Tidal Library Tools &mdash; corre localmente en tu máquina
   </footer>
 
