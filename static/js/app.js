@@ -31,6 +31,14 @@ const TOOLS = {
              <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
            </svg>`,
   },
+  download: {
+    title:    'Descargando de Tidal',
+    color:    'text-sky-400',
+    iconBg:   'bg-sky-500/10',
+    icon: `<svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+             <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+           </svg>`,
+  },
 };
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -123,6 +131,7 @@ function setupPanel(meta) {
   const panel = document.getElementById('operation-panel');
   panel.classList.remove('hidden');
 
+  document.getElementById('op-idle')?.classList.add('hidden');
   document.getElementById('op-title').textContent    = meta.title;
   document.getElementById('op-icon').className       = `w-7 h-7 rounded-lg flex items-center justify-center ${meta.iconBg}`;
   document.getElementById('op-icon').innerHTML       = meta.icon;
@@ -130,7 +139,9 @@ function setupPanel(meta) {
   document.getElementById('summary').classList.add('hidden');
   document.getElementById('summary-content').innerHTML = '';
 
-  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (window.innerWidth < 1024) {
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 
 // ── Line processing ───────────────────────────────────────────────────────────
@@ -152,6 +163,12 @@ function processLine(line) {
   if (line.includes('⚠️') && line.includes('Error'))    stats.errors++;
   if (line.includes('✅ Mejoradas'))                     tryExtract(line, 'improved');
   if (line.includes('✅ Total eliminados'))              tryExtract(line, 'removed');
+
+  // Stats de descarga (tiddl)
+  if (currentScript === 'download') {
+    if (/downloaded|descarg/i.test(line))                stats.downloaded = (stats.downloaded || 0) + 1;
+    if (/skip|exist|omit/i.test(line))                   stats.skipped    = (stats.skipped    || 0) + 1;
+  }
 
   appendLog(line);
 }
@@ -229,11 +246,13 @@ function renderSummary(success) {
 
   const items = [];
 
-  if (stats.added     > 0) items.push({ label: 'Agregadas',  value: stats.added,    color: 'text-emerald-400', bg: 'bg-emerald-500/10' });
-  if (stats.notFound  > 0) items.push({ label: 'No encontradas', value: stats.notFound, color: 'text-red-400', bg: 'bg-red-500/10' });
-  if (stats.improved  > 0) items.push({ label: 'Mejoradas',  value: stats.improved, color: 'text-emerald-400', bg: 'bg-emerald-500/10' });
-  if (stats.removed   > 0) items.push({ label: 'Eliminadas', value: stats.removed,  color: 'text-amber-400',  bg: 'bg-amber-500/10' });
-  if (stats.errors    > 0) items.push({ label: 'Errores',    value: stats.errors,   color: 'text-red-400',    bg: 'bg-red-500/10' });
+  if (stats.added      > 0) items.push({ label: 'Agregadas',       value: stats.added,      color: 'text-emerald-400', bg: 'bg-emerald-500/10' });
+  if (stats.notFound   > 0) items.push({ label: 'No encontradas',  value: stats.notFound,   color: 'text-red-400',     bg: 'bg-red-500/10'     });
+  if (stats.improved   > 0) items.push({ label: 'Mejoradas',       value: stats.improved,   color: 'text-emerald-400', bg: 'bg-emerald-500/10' });
+  if (stats.removed    > 0) items.push({ label: 'Eliminadas',      value: stats.removed,    color: 'text-amber-400',   bg: 'bg-amber-500/10'   });
+  if (stats.downloaded > 0) items.push({ label: 'Descargadas',     value: stats.downloaded, color: 'text-sky-400',     bg: 'bg-sky-500/10'     });
+  if (stats.skipped    > 0) items.push({ label: 'Omitidas',        value: stats.skipped,    color: 'text-gray-400',    bg: 'bg-gray-500/10'    });
+  if (stats.errors     > 0) items.push({ label: 'Errores',         value: stats.errors,     color: 'text-red-400',     bg: 'bg-red-500/10'     });
 
   if (items.length === 0) {
     items.push({
@@ -274,12 +293,12 @@ function setSession(state, label) {
 
   const map = {
     idle:    'bg-gray-600',
-    loading: 'bg-amber-400 animate-pulse',
-    ok:      'bg-emerald-400',
-    error:   'bg-red-400',
+    loading: 'bg-amber-400 animate-pulse dot-loading',
+    ok:      'bg-emerald-400 dot-ok',
+    error:   'bg-red-400 dot-error',
   };
 
-  dot.className  = `w-2 h-2 rounded-full transition-colors duration-500 ${map[state] || map.idle}`;
+  dot.className  = `w-2 h-2 rounded-full transition-all duration-500 ${map[state] || map.idle}`;
   text.textContent = label;
 }
 
@@ -351,8 +370,114 @@ async function exitApp() {
     </div>`;
 }
 
+// ── Descarga desde Tidal (tiddl) ──────────────────────────────────────────────
+async function runDownload(btn) {
+  if (activeReader) return;
+
+  const url     = document.getElementById('tidal-url').value.trim();
+  const outDir  = document.getElementById('download-dir').value.trim();
+  const quality = document.getElementById('dl-quality').value;
+  const cover   = document.getElementById('dl-cover').checked;
+
+  if (!url) {
+    const input = document.getElementById('tidal-url');
+    input.classList.add('border-red-500/50');
+    setTimeout(() => input.classList.remove('border-red-500/50'), 1500);
+    return;
+  }
+
+  currentScript = 'download';
+  stats = { added: 0, notFound: 0, errors: 0, downloaded: 0, skipped: 0 };
+
+  document.querySelectorAll('.btn-run').forEach(b => b.disabled = true);
+  setupPanel(TOOLS['download']);
+  setSession('loading', 'Iniciando descarga...');
+
+  let response;
+  try {
+    response = await fetch('/run/download', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ tidal_url: url, output_dir: outDir, quality, cover }),
+    });
+  } catch (e) {
+    appendLog(`❌ No se pudo conectar con el servidor: ${e.message}`, 'error');
+    finishOperation(false);
+    return;
+  }
+
+  if (!response.ok) {
+    appendLog(`❌ Error del servidor: ${response.status}`, 'error');
+    finishOperation(false);
+    return;
+  }
+
+  const reader  = response.body.getReader();
+  const decoder = new TextDecoder();
+  activeReader  = reader;
+
+  document.getElementById('stop-btn').classList.remove('hidden');
+  setProgressIndeterminate();
+
+  let buffer = '';
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop();
+
+      for (const part of parts) {
+        const line = part.trim();
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const data = JSON.parse(line.slice(6));
+          if (data.line !== undefined) processLine(data.line);
+          if (data.done) { finishOperation(data.code === 0); return; }
+        } catch (_) {}
+      }
+    }
+  } catch (e) {
+    if (e.name !== 'AbortError') appendLog(`⚠️  Conexión interrumpida: ${e.message}`, 'warn');
+  }
+
+  finishOperation(false);
+}
+
+// ── Selector de carpeta para descarga ─────────────────────────────────────────
+async function pickDownloadFolder() {
+  try {
+    const res  = await fetch('/pick-folder', { method: 'POST' });
+    const data = await res.json();
+    if (data.path) document.getElementById('download-dir').value = data.path;
+  } catch (e) {
+    console.error('Error al abrir selector de carpetas:', e);
+  }
+}
+
+// ── Estado de autenticación de tiddl ──────────────────────────────────────────
+async function checkTiddlStatus() {
+  const badge = document.getElementById('tiddl-status');
+  if (!badge) return;
+  try {
+    const res  = await fetch('/check-tiddl');
+    const data = await res.json();
+    badge.classList.remove('opacity-0');
+    if (data.ok) {
+      badge.className = 'hidden sm:flex items-center gap-1.5 text-xs text-emerald-400/70 bg-emerald-500/[0.08] px-3 py-1.5 rounded-lg border border-emerald-500/15 transition-opacity duration-700';
+      badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 inline-block"></span> tiddl autenticado';
+    } else {
+      badge.className = 'hidden sm:flex items-center gap-1.5 text-xs text-amber-400/70 bg-amber-500/[0.08] px-3 py-1.5 rounded-lg border border-amber-500/15 transition-opacity duration-700';
+      badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 inline-block"></span> Ejecuta: tiddl auth login';
+    }
+  } catch (_) {}
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const saved = localStorage.getItem('tidal_music_dir');
   if (saved) document.getElementById('music-dir').value = saved;
+  checkTiddlStatus();
 });

@@ -1,2 +1,3 @@
 flask>=3.0
 tidalapi>=0.7
+tiddl>=3.2
