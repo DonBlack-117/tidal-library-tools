@@ -15,6 +15,9 @@ build/
 tidal-session.json
 *.session.json
 
+# tiddl credentials (tokens de acceso de tiddl, no subir)
+.tiddl/
+
 # Archivos de log y resultados locales
 logs/*.txt
 !logs/.gitkeep

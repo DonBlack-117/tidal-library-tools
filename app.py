@@ -14,15 +14,22 @@ import json
 import threading
 import subprocess
 from pathlib import Path
-from flask import Flask, render_template, request, Response, stream_with_context
+from flask import (
+    Flask,
+    render_template,
+    request,
+    Response,
+    stream_with_context,
+    jsonify,
+)
 
 app = Flask(__name__)
 BASE_DIR = Path(__file__).parent
 
 SCRIPTS = {
-    "sync":    "core/sincronizar.py",
+    "sync": "core/sincronizar.py",
     "quality": "core/mejorar_calidad.py",
-    "dupes":   "core/limpiar_duplicados.py",
+    "dupes": "core/limpiar_duplicados.py",
 }
 
 # Estos scripts piden confirmación "si" en mitad de la ejecución.
@@ -89,6 +96,39 @@ def run_script(script):
     )
 
 
+@app.route("/run/download", methods=["POST"])
+def run_download():
+    from core.descargar import descargar_recurso
+
+    data = request.get_json(silent=True) or {}
+    tidal_url = data.get("tidal_url", "").strip()
+    output_dir = data.get("output_dir", "").strip()
+    quality = data.get("quality", "AUTO").strip()
+    cover = bool(data.get("cover", True))
+
+    if not tidal_url:
+        return jsonify({"error": "URL requerida"}), 400
+
+    def generate():
+        for line in descargar_recurso(tidal_url, output_dir, quality, cover):
+            yield f"data: {json.dumps({'line': line})}\n\n"
+        yield f"data: {json.dumps({'done': True, 'code': 0})}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.route("/check-tiddl", methods=["GET"])
+def check_tiddl():
+    from core.descargar import verificar_tiddl
+
+    ok, msg = verificar_tiddl()
+    return jsonify({"ok": ok, "message": msg})
+
+
 @app.route("/pick-folder", methods=["POST"])
 def pick_folder():
     """
@@ -103,8 +143,8 @@ def pick_folder():
 
     def open_dialog():
         root = tk.Tk()
-        root.withdraw()          # oculta la ventana principal de tkinter
-        root.wm_attributes("-topmost", True)   # el diálogo aparece al frente
+        root.withdraw()  # oculta la ventana principal de tkinter
+        root.wm_attributes("-topmost", True)  # el diálogo aparece al frente
         path = filedialog.askdirectory(title="Seleccionar carpeta de música")
         root.destroy()
         selected["path"] = path or ""
@@ -122,9 +162,11 @@ def shutdown():
     Cierra el servidor Flask de forma limpia.
     Envía la respuesta primero y luego termina el proceso con un pequeño delay.
     """
+
     def stop():
         import time
-        time.sleep(0.3)   # margen para que el navegador reciba la respuesta
+
+        time.sleep(0.3)  # margen para que el navegador reciba la respuesta
         os._exit(0)
 
     threading.Thread(target=stop, daemon=True).start()
@@ -132,8 +174,11 @@ def shutdown():
 
 
 if __name__ == "__main__":
+    import webbrowser
+
     print("=" * 50)
     print("  Tidal Library Tools — Interfaz Web")
     print("=" * 50)
     print("\n  Abre tu navegador en:  http://localhost:5000\n")
+    threading.Timer(0.8, lambda: webbrowser.open("http://localhost:5000")).start()
     app.run(debug=False, port=5000, threaded=True)
