@@ -20,6 +20,7 @@ tidal-session.json
 
 # Archivos de log y resultados locales
 logs/*.txt
+logs/*.log
 !logs/.gitkeep
 
 # IDEs
