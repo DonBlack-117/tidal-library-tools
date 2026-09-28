@@ -4,827 +4,373 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tidal Library Tools</title>
+  <meta name="description" content="Descarga, mejora y sincroniza tu biblioteca de Tidal en local.">
+  <meta name="theme-color" content="#0E1012">
+  <link rel="icon" type="image/png" href="/static/img/icontidal.png">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       theme: {
         extend: {
           colors: {
-            base:     '#0D0D0D',
-            surface:  '#161616',
-            elevated: '#1F1F1F',
-            border:   '#2A2A2A',
-            accent:   '#00D4FF',
+            ink:    '#0E1012',   // fondo
+            panel:  '#14171A',   // superficies
+            raised: '#1A1E22',   // controles
+            line:   '#252A2F',   // bordes
+            mute:   '#7D868F',   // texto secundario
+            soft:   '#A9B1B8',   // texto de apoyo
+            accent: '#7CC6D6',   // único acento
           },
           fontFamily: {
-            mono: ['JetBrains Mono', 'Fira Code', 'Cascadia Code', 'monospace'],
+            sans: ['Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            mono: ['"Geist Mono"', 'ui-monospace', 'monospace'],
           },
-          animation: {
-            'pulse-slow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-          }
-        }
-      }
-    }
+        },
+      },
+    };
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Inter', sans-serif; }
+    :root { color-scheme: dark; }
+    html { scroll-behavior: smooth; }
+    body { font-feature-settings: "ss01", "cv11"; -webkit-font-smoothing: antialiased; }
+    h1, h2, h3, p { text-wrap: pretty; }
+    h1, h2 { text-wrap: balance; }
 
-    /* ── Scrollbar ── */
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: #1F1F1F; }
-    ::-webkit-scrollbar-thumb { background: #3A3A3A; border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: #4A4A4A; }
-
-    /* ── Background ambient orbs ── */
-    .bg-orb {
-      position: fixed;
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 0;
+    /* Grano: rompe la planitud del fondo sin pesar */
+    .grain {
+      position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: .05;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
     }
-    .bg-orb-1 {
-      width: 700px; height: 700px;
-      background: radial-gradient(circle, rgba(0,212,255,0.07) 0%, transparent 65%);
-      top: -200px; right: -200px;
-      filter: blur(80px);
-      animation: orb-a 20s ease-in-out infinite;
-    }
-    .bg-orb-2 {
-      width: 550px; height: 550px;
-      background: radial-gradient(circle, rgba(139,92,246,0.07) 0%, transparent 65%);
-      bottom: 50px; left: -200px;
-      filter: blur(80px);
-      animation: orb-b 25s ease-in-out infinite;
-    }
-    .bg-orb-3 {
-      width: 350px; height: 350px;
-      background: radial-gradient(circle, rgba(0,212,255,0.04) 0%, transparent 65%);
-      top: 60%; right: 5%;
-      filter: blur(60px);
-      animation: orb-a 16s ease-in-out infinite reverse;
-    }
-    @keyframes orb-a {
-      0%, 100% { transform: translate(0, 0) scale(1); }
-      33%       { transform: translate(-45px, 30px) scale(1.06); }
-      66%       { transform: translate(20px, -20px) scale(0.94); }
-    }
-    @keyframes orb-b {
-      0%, 100% { transform: translate(0, 0) scale(1); }
-      50%       { transform: translate(40px, -30px) scale(1.08); }
+    /* Luz ambiental única, fija, sin animar */
+    .ambient {
+      position: fixed; inset: -20% -10% auto auto; width: 60vw; height: 60vw; z-index: 0; pointer-events: none;
+      background: radial-gradient(closest-side, rgba(124,198,214,.07), transparent 70%);
     }
 
-    /* ── Log lines ── */
-    .log-line { animation: fadeIn 0.1s ease-in; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+    /* Controles */
+    .field {
+      background: #1A1E22; border: 1px solid #252A2F; color: #E7EBEE;
+      transition: border-color .18s ease, background-color .18s ease;
+    }
+    .field::placeholder { color: #59616A; }
+    .field:hover { border-color: #313840; }
+    .field:focus { outline: none; border-color: rgba(124,198,214,.55); background: #1C2126; }
+    select.field { appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%237D868F' stroke-width='1.6'><path d='M3 4.5l3 3 3-3'/></svg>"); background-repeat: no-repeat; background-position: right .75rem center; padding-right: 2rem; }
 
-    /* ── Progress bar ── */
+    .btn {
+      transition: background-color .18s ease, border-color .18s ease, color .18s ease, transform .12s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:not(:disabled):active { transform: scale(.98); }
+    .btn:disabled { opacity: .38; cursor: not-allowed; }
+    .btn-primary { background: #E7EBEE; color: #0E1012; }
+    .btn-primary:not(:disabled):hover { background: #FFFFFF; }
+    .btn-quiet { background: #1A1E22; border: 1px solid #252A2F; color: #D5DBDF; }
+    .btn-quiet:not(:disabled):hover { border-color: #3A424A; background: #1E2327; }
+    .btn-accent { background: rgba(124,198,214,.12); border: 1px solid rgba(124,198,214,.28); color: #A9DCE7; }
+    .btn-accent:not(:disabled):hover { background: rgba(124,198,214,.18); border-color: rgba(124,198,214,.5); }
+
+    :focus-visible { outline: 2px solid rgba(124,198,214,.8); outline-offset: 2px; border-radius: 8px; }
+
+    /* Filas de herramientas: separadas por línea, sin tarjeta */
+    .row + .row { border-top: 1px solid #1F2428; }
+
+    /* Log */
+    #log-output { font-variant-numeric: tabular-nums; scrollbar-width: thin; scrollbar-color: #2C3237 transparent; }
+    .log-line { animation: line-in .14s ease-out; }
+    @keyframes line-in { from { opacity: 0; transform: translateY(2px); } }
+
+    /* Barra de progreso (JS usa .progress-indeterminate) */
     .progress-indeterminate {
-      background: linear-gradient(90deg, transparent 0%, #00D4FF 35%, #7c3aed 65%, transparent 100%);
-      background-size: 200% 100%;
-      animation: indeterminate 1.8s ease-in-out infinite;
-      box-shadow: 0 0 14px rgba(0,212,255,0.7), 0 0 30px rgba(0,212,255,0.25);
+      background: linear-gradient(90deg, transparent, #7CC6D6 45%, transparent);
+      background-size: 40% 100%; background-repeat: no-repeat;
+      animation: sweep 1.4s cubic-bezier(.45,.05,.55,.95) infinite;
     }
-    @keyframes indeterminate {
-      0%   { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
-    }
+    @keyframes sweep { from { background-position: -40% 0; } to { background-position: 140% 0; } }
 
-    /* ── Tool cards ── */
-    .tool-card {
-      transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
-      position: relative;
-      overflow: hidden;
-    }
-    .tool-card::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(135deg, rgba(139,92,246,0.04) 0%, transparent 60%);
-      opacity: 0;
-      transition: opacity 0.3s;
-      pointer-events: none;
-    }
-    .tool-card:hover::before { opacity: 1; }
-    .tool-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 20px 50px rgba(0,0,0,0.5), 0 0 30px rgba(139,92,246,0.12);
-    }
+    /* Entrada escalonada, una sola vez */
+    .reveal { opacity: 0; animation: reveal .5s cubic-bezier(.2,.7,.2,1) forwards; }
+    .reveal:nth-child(2) { animation-delay: .06s; }
+    .reveal:nth-child(3) { animation-delay: .12s; }
+    .reveal:nth-child(4) { animation-delay: .18s; }
+    @keyframes reveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-    /* ── Buttons ── */
-    .btn-run {
-      transition: all 0.18s;
-      position: relative;
-      overflow: hidden;
-    }
-    .btn-run::after {
-      content: '';
-      position: absolute;
-      top: 0; left: -120%;
-      width: 55%; height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
-      transform: skewX(-20deg);
-    }
-    .btn-run:not(:disabled):hover::after {
-      animation: shimmer-sweep 0.55s ease forwards;
-    }
-    .btn-run:not(:disabled):hover { filter: brightness(1.12); }
-    .btn-run:active { transform: scale(0.97); }
-    .btn-run:disabled { opacity: 0.4; cursor: not-allowed; transform: none; filter: none; }
-    @keyframes shimmer-sweep {
-      from { left: -120%; }
-      to   { left: 160%; }
-    }
+    #summary-content > div { animation: reveal .3s cubic-bezier(.2,.7,.2,1) both; }
 
-    /* ── Waveform bars ── */
-    .wave-bars {
-      display: flex;
-      align-items: center;
-      gap: 2px;
-      height: 16px;
-    }
-    .wave-bar {
-      width: 2px;
-      border-radius: 2px;
-      background: currentColor;
-      animation: wave-bounce var(--dur) ease-in-out var(--delay) infinite;
-    }
-    .wave-bar:nth-child(1) { --dur: 0.80s; --delay: 0.00s; }
-    .wave-bar:nth-child(2) { --dur: 1.10s; --delay: 0.12s; }
-    .wave-bar:nth-child(3) { --dur: 0.70s; --delay: 0.24s; }
-    .wave-bar:nth-child(4) { --dur: 1.00s; --delay: 0.08s; }
-    .wave-bar:nth-child(5) { --dur: 0.90s; --delay: 0.18s; }
-    @keyframes wave-bounce {
-      0%, 100% { height: 3px;  opacity: 0.35; }
-      50%       { height: 14px; opacity: 0.9;  }
-    }
-
-    /* ── Pipeline connector ── */
-    .step-connector {
-      display: flex;
-      align-items: center;
-      color: #3A3A3A;
-      flex-shrink: 0;
-      padding: 0 4px;
-    }
-
-    /* ── Stage divider ── */
-    .stage-divider {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      position: relative;
-    }
-    .stage-divider::before, .stage-divider::after {
-      content: '';
-      display: block;
-      width: 1px;
-      height: 18px;
-      background: linear-gradient(to bottom, #2A2A2A, #3A3A3A);
-    }
-
-    /* ── Gradient text ── */
-    .text-grad-cyan {
-      background: linear-gradient(90deg, #00D4FF 0%, #7ff6ff 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .text-grad-violet {
-      background: linear-gradient(90deg, #a78bfa 0%, #c4b5fd 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    /* ── Section hover glow ── */
-    .section-cyan  { transition: box-shadow 0.35s; }
-    .section-cyan:hover  { box-shadow: 0 0 0 1px rgba(0,212,255,0.12), 0 24px 70px rgba(0,0,0,0.3); }
-    .section-violet { transition: box-shadow 0.35s; }
-    .section-violet:hover { box-shadow: 0 0 0 1px rgba(139,92,246,0.12), 0 24px 70px rgba(0,0,0,0.3); }
-
-    /* ── Step badge glow on section hover ── */
-    .badge-cyan, .badge-violet { transition: box-shadow 0.3s; }
-    .section-cyan:hover  .badge-cyan   { box-shadow: 0 0 14px rgba(0,212,255,0.5); }
-    .section-violet:hover .badge-violet { box-shadow: 0 0 14px rgba(139,92,246,0.5); }
-
-    /* ── Entrance animations ── */
-    .fade-up {
-      opacity: 0;
-      animation: fade-up-in 0.5s ease-out forwards;
-    }
-    .d1 { animation-delay: 0.05s; }
-    .d2 { animation-delay: 0.18s; }
-    .d3 { animation-delay: 0.30s; }
-    @keyframes fade-up-in {
-      from { opacity: 0; transform: translateY(14px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    /* ── Operation panel entrance ── */
-    #operation-panel:not(.hidden) {
-      animation: panel-appear 0.4s ease-out;
-    }
-    @keyframes panel-appear {
-      from { opacity: 0; transform: translateY(10px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    /* ── Log terminal scanlines ── */
-    #log-output { position: relative; }
-    #log-output::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: repeating-linear-gradient(
-        0deg, transparent, transparent 3px,
-        rgba(0,0,0,0.04) 3px, rgba(0,0,0,0.04) 4px
-      );
-      pointer-events: none;
-    }
-
-    /* ── Summary chip entrance ── */
-    #summary-content > div {
-      animation: chip-pop 0.28s ease-out both;
-    }
-    #summary-content > div:nth-child(1) { animation-delay: 0.00s; }
-    #summary-content > div:nth-child(2) { animation-delay: 0.06s; }
-    #summary-content > div:nth-child(3) { animation-delay: 0.12s; }
-    #summary-content > div:nth-child(4) { animation-delay: 0.18s; }
-    #summary-content > div:nth-child(5) { animation-delay: 0.24s; }
-    @keyframes chip-pop {
-      from { opacity: 0; transform: scale(0.82) translateY(5px); }
-      to   { opacity: 1; transform: scale(1) translateY(0); }
-    }
-
-    /* ── Navbar logo glow ── */
-    .logo-icon {
-      box-shadow: 0 0 16px rgba(0,212,255,0.22), inset 0 0 12px rgba(0,212,255,0.06);
-      transition: box-shadow 0.3s;
-    }
-    .logo-icon:hover {
-      box-shadow: 0 0 28px rgba(0,212,255,0.4), inset 0 0 16px rgba(0,212,255,0.1);
-    }
-
-    /* ── Session dot glow ── */
-    .dot-ok      { box-shadow: 0 0 8px rgba(52,211,153,0.7); }
-    .dot-loading { box-shadow: 0 0 8px rgba(251,191,36,0.7); }
-    .dot-error   { box-shadow: 0 0 8px rgba(248,113,113,0.7); }
-
-    /* ── Input focus glow ── */
-    #music-dir:focus {
-      box-shadow: 0 0 0 2px rgba(0,212,255,0.18);
-    }
-
-    /* ── Sky (Stage 3) ── */
-    .section-sky { transition: box-shadow 0.35s; }
-    .section-sky:hover { box-shadow: 0 0 0 1px rgba(14,165,233,0.12), 0 24px 70px rgba(0,0,0,0.3); }
-    .badge-sky { transition: box-shadow 0.3s; }
-    .section-sky:hover .badge-sky { box-shadow: 0 0 14px rgba(14,165,233,0.5); }
-    .text-grad-sky {
-      background: linear-gradient(90deg, #38bdf8 0%, #7dd3fc 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    #download-dir:focus, #tidal-url:focus {
-      box-shadow: 0 0 0 2px rgba(14,165,233,0.18);
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      .reveal { opacity: 1; }
+      html { scroll-behavior: auto; }
     }
   </style>
 </head>
 
-<body class="bg-[#0D0D0D] text-gray-100 min-h-screen overflow-x-hidden">
+<body class="bg-ink text-[#E7EBEE] font-sans min-h-[100dvh] overflow-x-hidden">
+  <a href="#contenido" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-3 focus:py-2 focus:rounded-lg focus:bg-panel focus:text-sm">Saltar al contenido</a>
+  <div class="ambient" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
 
-  <!-- ── Ambient background orbs ── -->
-  <div class="bg-orb bg-orb-1" aria-hidden="true"></div>
-  <div class="bg-orb bg-orb-2" aria-hidden="true"></div>
-  <div class="bg-orb bg-orb-3" aria-hidden="true"></div>
-
-  <!-- ── Navbar ── -->
-  <nav class="sticky top-0 z-50 bg-[#0D0D0D]/85 backdrop-blur-md border-b border-[#2A2A2A]/80 px-6 py-3.5">
-    <div class="max-w-4xl mx-auto flex items-center justify-between">
-
-      <!-- Logo + Title -->
-      <div class="flex items-center gap-3">
-        <div class="logo-icon w-8 h-8 rounded-lg bg-[#00D4FF]/10 border border-[#00D4FF]/25 flex items-center justify-center shrink-0">
-          <svg class="w-5 h-5 text-[#00D4FF]" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 3v10.55A4 4 0 1014 17V7h4V3h-6z"/>
-          </svg>
-        </div>
-        <div class="flex items-center gap-3">
-          <span class="font-semibold tracking-tight text-grad-cyan">Tidal Library Tools</span>
-          <!-- Animated waveform bars -->
-          <div class="wave-bars text-[#00D4FF]/50 hidden sm:flex" aria-hidden="true">
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-          </div>
-          <span class="text-xs text-gray-600 font-normal hidden sm:inline">gestión de biblioteca</span>
-        </div>
+  <!-- ── Barra superior ─────────────────────────────────────────── -->
+  <header class="sticky top-0 z-40 bg-ink/80 backdrop-blur-md border-b border-line/70">
+    <div class="max-w-[1320px] mx-auto px-5 sm:px-8 h-14 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3 min-w-0">
+        <img src="/static/img/icontidal.png" alt="" class="w-7 h-7 rounded-[9px]">
+        <span class="font-semibold tracking-[-0.01em] truncate">Tidal Library Tools</span>
       </div>
 
-      <!-- Session status + Exit -->
-      <div class="flex items-center gap-4">
-        <div class="flex items-center gap-2">
-          <div id="session-dot" class="w-2 h-2 rounded-full bg-gray-600 transition-all duration-500"></div>
-          <span id="session-label" class="text-gray-500 text-xs">Listo</span>
+      <div class="flex items-center gap-2 sm:gap-3">
+        <div id="tiddl-status" class="hidden sm:flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border opacity-0 transition-opacity duration-500"></div>
+        <div class="flex items-center gap-2 px-2.5 py-1 rounded-md" role="status" aria-live="polite">
+          <span id="session-dot" class="w-2 h-2 rounded-full bg-[#4A525A]"></span>
+          <span id="session-label" class="text-xs text-mute">Listo</span>
         </div>
-        <button
-          onclick="exitApp()"
-          id="exit-btn"
-          title="Salir de la aplicación"
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-gray-600
-                 hover:text-red-400 hover:bg-red-400/10 border border-transparent
-                 hover:border-red-400/20 transition-all">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round"
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-          </svg>
+        <button id="exit-btn" onclick="exitApp()" title="Cerrar el servidor"
+          class="btn text-xs text-mute hover:text-[#E7A6A6] px-2.5 py-1.5 rounded-md hover:bg-[#E7A6A6]/10">
           Salir
         </button>
       </div>
-
     </div>
-  </nav>
+  </header>
 
-  <!-- ── Main Content ── -->
-  <main class="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <main id="contenido" class="relative z-10 max-w-[1320px] mx-auto px-5 sm:px-8 pt-10 pb-16">
 
-    <div class="lg:grid lg:grid-cols-[2fr_3fr] lg:gap-8 lg:items-start">
+    <div class="mb-10 max-w-2xl reveal">
+      <h1 class="text-[2.1rem] sm:text-[2.6rem] leading-[1.05] font-semibold tracking-[-0.035em]">
+        Tu biblioteca de Tidal, <span class="text-mute">en tu disco.</span>
+      </h1>
+      <p class="mt-3 text-[15px] text-soft leading-relaxed max-w-[60ch]">
+        Descarga en la calidad máxima que da tu cuenta, con carátula, letras y metadatos.
+        Todo cae en <code class="font-mono text-[13px] text-[#D5DBDF]">~/Music/Tidal/canciones</code>.
+      </p>
 
-    <!-- ══ LEFT: controles y etapas ══════════════════════════════════ -->
-    <div class="space-y-6">
-
-    <!-- ════════════════════════════════════════════════════════
-         ETAPA 1 — Importar música local a Tidal
-         ════════════════════════════════════════════════════════ -->
-    <section class="section-cyan fade-up d1 rounded-2xl border border-[#00D4FF]/20 bg-[#161616] overflow-hidden">
-
-      <!-- Stage header -->
-      <div class="flex items-center justify-between px-5 py-3.5 border-b border-[#00D4FF]/10 bg-gradient-to-r from-[#00D4FF]/[0.07] via-[#00D4FF]/[0.03] to-transparent">
-        <div class="flex items-center gap-3">
-          <span class="badge-cyan w-6 h-6 rounded-full bg-[#00D4FF]/15 text-[#00D4FF] text-xs font-bold flex items-center justify-center shrink-0">1</span>
-          <div>
-            <span class="text-sm font-semibold text-grad-cyan">Importar música local a Tidal</span>
-            <span class="ml-2 text-xs text-gray-600 hidden sm:inline">Busca tus canciones descargadas y agrégalas a My Tracks</span>
-          </div>
-        </div>
-        <!-- Source → destination badge -->
-        <div class="hidden sm:flex items-center gap-1.5 text-xs text-gray-600 bg-[#1F1F1F] px-3 py-1.5 rounded-lg border border-[#2A2A2A]">
-          <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-          </svg>
-          <span>Tu ordenador</span>
-          <svg class="w-3 h-3 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-          </svg>
-          <svg class="w-3.5 h-3.5 text-[#00D4FF]/60" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 3v10.55A4 4 0 1014 17V7h4V3h-6z"/>
-          </svg>
-          <span class="text-[#00D4FF]/60">Tidal</span>
-        </div>
-      </div>
-
-      <!-- Pipeline: Step 1 → Step 2 -->
-      <div class="p-5">
-        <div class="flex flex-col sm:flex-row items-stretch sm:items-start gap-3 sm:gap-0">
-
-          <!-- ── Paso 1: Carpeta local ── -->
-          <div class="flex-1 rounded-xl bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#00D4FF]/20 p-4 transition-colors">
-            <div class="flex items-center gap-2 mb-3">
-              <span class="text-[10px] font-bold text-[#00D4FF]/60 uppercase tracking-widest">Paso 1</span>
-              <div class="h-px flex-1 bg-[#2A2A2A]"></div>
-            </div>
-            <div class="flex items-center gap-2 mb-2">
-              <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
-              </svg>
-              <span class="text-xs font-semibold text-gray-300">Selecciona tu carpeta de música</span>
-            </div>
-            <p class="text-[11px] text-gray-600 mb-3 leading-relaxed">
-              La carpeta donde están tus canciones descargadas.<br>
-              Formato esperado: <code class="text-gray-500 font-mono">Artista - Título.mp3</code>
-            </p>
-            <div class="flex gap-2">
-              <input
-                id="music-dir"
-                type="text"
-                placeholder="C:\Music\Telegram"
-                class="flex-1 min-w-0 bg-[#141414] text-gray-100 rounded-lg px-3 py-2 text-xs
-                       border border-[#333] focus:outline-none focus:border-[#00D4FF]/40
-                       placeholder:text-gray-700 transition-all"
-              />
-              <button
-                onclick="pickFolder()"
-                id="pick-btn"
-                title="Abrir explorador de carpetas"
-                class="px-2.5 py-2 bg-[#141414] hover:bg-[#1E1E1E] rounded-lg text-gray-500
-                       hover:text-[#00D4FF] border border-[#333] hover:border-[#00D4FF]/30
-                       transition-all shrink-0"
-                aria-label="Seleccionar carpeta">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
-                </svg>
-              </button>
-              <button
-                onclick="saveConfig()"
-                id="save-btn"
-                class="px-3 py-2 bg-[#141414] hover:bg-[#1E1E1E] rounded-lg text-xs text-gray-500
-                       hover:text-[#00D4FF] border border-[#333] hover:border-[#00D4FF]/30
-                       transition-all whitespace-nowrap">
-                Guardar
-              </button>
-            </div>
-          </div>
-
-          <!-- ── Connector arrow ── -->
-          <div class="step-connector justify-center sm:mt-10">
-            <svg class="hidden sm:block w-8 h-5 text-[#333]" fill="none" stroke="currentColor" viewBox="0 0 32 20" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M2 10h24m0 0l-6-6m6 6l-6 6"/>
-            </svg>
-            <svg class="sm:hidden w-5 h-8 text-[#333]" fill="none" stroke="currentColor" viewBox="0 0 20 32" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M10 2v24m0 0l-6-6m6 6l6-6"/>
-            </svg>
-          </div>
-
-          <!-- ── Paso 2: Sincronizar ── -->
-          <div class="flex-1 rounded-xl bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#00D4FF]/20 p-4 transition-colors">
-            <div class="flex items-center gap-2 mb-3">
-              <span class="text-[10px] font-bold text-[#00D4FF]/60 uppercase tracking-widest">Paso 2</span>
-              <div class="h-px flex-1 bg-[#2A2A2A]"></div>
-            </div>
-            <div class="flex items-center gap-2 mb-2">
-              <svg class="w-4 h-4 text-[#00D4FF] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-              </svg>
-              <span class="text-xs font-semibold text-gray-300">Sincronizar con Tidal</span>
-            </div>
-            <p class="text-[11px] text-gray-600 mb-3 leading-relaxed">
-              Busca cada canción en el catálogo de Tidal y la agrega a tu <em class="text-gray-500 not-italic">My Tracks</em> si aún no la tienes.
-            </p>
-            <button
-              onclick="runTool('sync', this)"
-              class="btn-run w-full py-2.5 bg-[#00D4FF]/10 hover:bg-[#00D4FF]/20 text-[#00D4FF]
-                     rounded-lg text-xs font-semibold border border-[#00D4FF]/25
-                     hover:border-[#00D4FF]/50 hover:shadow-[0_0_22px_rgba(0,212,255,0.18)]
-                     flex items-center justify-center gap-2 transition-all">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-                <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
-              Iniciar sincronización
-            </button>
-          </div>
-
-        </div>
-      </div>
-    </section>
-
-    <!-- ════════════════════════════════════════════════════════
-         Divider entre etapas
-         ════════════════════════════════════════════════════════ -->
-    <div class="stage-divider py-1 fade-up d2">
-      <div class="flex items-center gap-3 text-xs text-gray-700">
-        <div class="h-px flex-1 bg-gradient-to-r from-transparent via-[#222] to-[#222]"></div>
-        <div class="flex items-center gap-2 bg-[#161616] border border-[#2A2A2A] rounded-full px-4 py-1.5 hover:border-[#333] transition-colors cursor-default">
-          <svg class="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
-          </svg>
-          <span class="text-gray-600">Luego, optimiza tu biblioteca en Tidal</span>
-        </div>
-        <div class="h-px flex-1 bg-gradient-to-l from-transparent via-[#222] to-[#222]"></div>
-      </div>
+      <!-- Estado de la biblioteca (lo llena app.js) -->
+      <dl id="library-strip" aria-label="Estado de la biblioteca"
+        class="mt-6 flex flex-wrap gap-x-7 gap-y-3 text-[13px]">
+        <div><dt class="text-xs text-mute">Canciones</dt><dd id="lib-songs" class="font-mono text-[15px] font-medium tabular-nums mt-0.5">—</dd></div>
+        <div><dt class="text-xs text-mute">En Hi-Res</dt><dd id="lib-hires" class="font-mono text-[15px] font-medium tabular-nums mt-0.5">—</dd></div>
+        <div><dt class="text-xs text-mute">Con letra</dt><dd id="lib-lyrics" class="font-mono text-[15px] font-medium tabular-nums mt-0.5">—</dd></div>
+        <div><dt class="text-xs text-mute">Playlists</dt><dd id="lib-playlists" class="font-mono text-[15px] font-medium tabular-nums mt-0.5">—</dd></div>
+        <div><dt class="text-xs text-mute">En disco</dt><dd id="lib-size" class="font-mono text-[15px] font-medium tabular-nums mt-0.5">—</dd></div>
+        <div><dt class="text-xs text-mute">Teléfono</dt><dd id="lib-phone" class="font-mono text-[15px] font-medium mt-0.5 text-mute">—</dd></div>
+      </dl>
     </div>
 
-    <!-- ════════════════════════════════════════════════════════
-         ETAPA 2 — Optimización dentro de Tidal
-         ════════════════════════════════════════════════════════ -->
-    <section class="section-violet fade-up d3 rounded-2xl border border-violet-500/20 bg-[#161616] overflow-hidden">
+    <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-start">
 
-      <!-- Stage header -->
-      <div class="flex items-center justify-between px-5 py-3.5 border-b border-violet-500/10 bg-gradient-to-r from-violet-500/[0.07] via-violet-500/[0.03] to-transparent">
-        <div class="flex items-center gap-3">
-          <span class="badge-violet w-6 h-6 rounded-full bg-violet-500/15 text-violet-400 text-xs font-bold flex items-center justify-center shrink-0">2</span>
-          <div>
-            <span class="text-sm font-semibold text-grad-violet">Optimizar biblioteca en Tidal</span>
-            <span class="ml-2 text-xs text-gray-600 hidden sm:inline">Opera directamente sobre tus My Tracks en la nube</span>
+      <!-- ══ Columna izquierda ══════════════════════════════════════ -->
+      <div class="space-y-12">
+
+        <!-- ── Descargar ─────────────────────────────────────────── -->
+        <section aria-labelledby="t-descargar" class="reveal">
+          <div class="flex items-baseline justify-between mb-5">
+            <h2 id="t-descargar" class="text-lg font-semibold tracking-[-0.015em]">Descargar</h2>
+            <span class="text-xs text-mute">calidad máxima · salta lo que ya tienes</span>
           </div>
-        </div>
-        <div class="hidden sm:flex items-center gap-1.5 text-xs text-violet-400/60 bg-violet-500/[0.08] px-3 py-1.5 rounded-lg border border-violet-500/15">
-          <svg class="w-3.5 h-3.5 text-[#00D4FF]/50" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 3v10.55A4 4 0 1014 17V7h4V3h-6z"/>
-          </svg>
-          <span>Solo en Tidal · no requiere carpeta local</span>
-        </div>
-      </div>
 
-      <!-- Cards: Mejorar calidad + Limpiar duplicados -->
-      <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-        <!-- Card: Mejorar Calidad -->
-        <div class="tool-card rounded-xl bg-[#1A1A1A] border border-[#2A2A2A] hover:border-violet-500/30 p-4">
-          <div class="flex items-start justify-between mb-3">
-            <div class="w-9 h-9 rounded-xl bg-violet-500/10 border border-violet-500/[0.12] flex items-center justify-center">
-              <svg class="w-[18px] h-[18px] text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
-              </svg>
-            </div>
-            <div class="flex flex-col items-end gap-0.5">
-              <span class="text-[9px] text-emerald-400/80 font-bold tracking-wide bg-emerald-500/10 border border-emerald-500/15 px-1.5 py-0.5 rounded">HI-RES</span>
-              <span class="text-[9px] text-emerald-400/50">LOSSLESS</span>
-              <span class="text-[9px] text-gray-700 line-through">HIGH</span>
-            </div>
-          </div>
-          <h3 class="text-sm font-semibold text-gray-200 mb-1">Mejorar Calidad</h3>
-          <p class="text-[11px] text-gray-600 mb-4 leading-relaxed">
-            Para cada canción en My Tracks, busca si existe una versión de mayor calidad (Hi-Res, Lossless) y la reemplaza automáticamente.
-          </p>
-          <button
-            onclick="runTool('quality', this)"
-            class="btn-run w-full py-2.5 bg-violet-500/10 hover:bg-violet-500/20 text-violet-400
-                   rounded-lg text-xs font-semibold border border-violet-500/20
-                   hover:border-violet-500/45 hover:shadow-[0_0_22px_rgba(139,92,246,0.18)]
-                   flex items-center justify-center gap-2 transition-all">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          <!-- Acción principal -->
+          <button id="mytracks-btn" onclick="runDownloadMyTracks(this)"
+            class="btn btn-run btn-primary w-full rounded-xl px-5 py-4 flex items-center justify-between gap-4 text-left">
+            <span>
+              <span class="block text-[15px] font-semibold">Descargar My Tracks</span>
+              <span class="block text-[13px] text-[#4B545C] mt-0.5">Todas tus pistas favoritas que aún no estén en disco</span>
+            </span>
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/>
             </svg>
-            Mejorar calidad
           </button>
-        </div>
 
-        <!-- Card: Limpiar Duplicados -->
-        <div class="tool-card rounded-xl bg-[#1A1A1A] border border-[#2A2A2A] hover:border-violet-500/30 p-4">
-          <div class="flex items-start justify-between mb-3">
-            <div class="w-9 h-9 rounded-xl bg-violet-500/10 border border-violet-500/[0.12] flex items-center justify-center">
-              <svg class="w-[18px] h-[18px] text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-              </svg>
-            </div>
-            <div class="flex flex-col items-end gap-0.5">
-              <span class="text-[9px] text-emerald-400/80 font-bold bg-emerald-500/10 border border-emerald-500/15 px-1.5 py-0.5 rounded">CONSERVA</span>
-              <span class="text-[9px] text-red-400/50 line-through">copia 1</span>
-              <span class="text-[9px] text-red-400/50 line-through">copia 2</span>
-            </div>
-          </div>
-          <h3 class="text-sm font-semibold text-gray-200 mb-1">Limpiar Duplicados</h3>
-          <p class="text-[11px] text-gray-600 mb-4 leading-relaxed">
-            Escanea My Tracks en busca de canciones repetidas. Conserva la de mayor calidad y elimina las copias extra automáticamente.
-          </p>
-          <button
-            onclick="runTool('dupes', this)"
-            class="btn-run w-full py-2.5 bg-violet-500/10 hover:bg-violet-500/20 text-violet-400
-                   rounded-lg text-xs font-semibold border border-violet-500/20
-                   hover:border-violet-500/45 hover:shadow-[0_0_22px_rgba(139,92,246,0.18)]
-                   flex items-center justify-center gap-2 transition-all">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            Limpiar duplicados
-          </button>
-        </div>
+          <div class="mt-3 rounded-xl bg-panel border border-line divide-y divide-[#1F2428]">
 
-      </div>
-    </section>
-
-    <!-- ════════════════════════════════════════════════════════
-         Divider 2→3
-         ════════════════════════════════════════════════════════ -->
-    <div class="stage-divider py-1 fade-up" style="animation-delay:0.40s">
-      <div class="flex items-center gap-3 text-xs text-gray-700">
-        <div class="h-px flex-1 bg-gradient-to-r from-transparent via-[#222] to-[#222]"></div>
-        <div class="flex items-center gap-2 bg-[#161616] border border-[#2A2A2A] rounded-full px-4 py-1.5 hover:border-[#333] transition-colors cursor-default">
-          <svg class="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
-          </svg>
-          <span class="text-gray-600">O descarga directamente de Tidal</span>
-        </div>
-        <div class="h-px flex-1 bg-gradient-to-l from-transparent via-[#222] to-[#222]"></div>
-      </div>
-    </div>
-
-    <!-- ════════════════════════════════════════════════════════
-         ETAPA 3 — Descargar de Tidal (tiddl)
-         ════════════════════════════════════════════════════════ -->
-    <section class="section-sky fade-up rounded-2xl border border-sky-500/20 bg-[#161616] overflow-hidden" style="animation-delay:0.52s">
-
-      <!-- Stage header -->
-      <div class="flex items-center justify-between px-5 py-3.5 border-b border-sky-500/10 bg-gradient-to-r from-sky-500/[0.07] via-sky-500/[0.03] to-transparent">
-        <div class="flex items-center gap-3">
-          <span class="badge-sky w-6 h-6 rounded-full bg-sky-500/15 text-sky-400 text-xs font-bold flex items-center justify-center shrink-0">3</span>
-          <div>
-            <span class="text-sm font-semibold text-grad-sky">Descargar de Tidal</span>
-            <span class="ml-2 text-xs text-gray-600 hidden sm:inline">Tracks, álbumes, playlists o artistas completos · requiere tiddl</span>
-          </div>
-        </div>
-        <!-- tiddl auth status badge (populated by JS) -->
-        <div id="tiddl-status" class="hidden sm:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border opacity-0 transition-opacity duration-700"></div>
-      </div>
-
-      <div class="p-5 space-y-3">
-
-        <!-- URL input -->
-        <div>
-          <label class="text-[10px] font-bold text-sky-400/60 uppercase tracking-widest mb-1.5 block">URL o ID de Tidal</label>
-          <input
-            id="tidal-url"
-            type="text"
-            placeholder="https://listen.tidal.com/album/123  o  playlist/456  o  78910"
-            class="w-full bg-[#141414] text-gray-100 rounded-lg px-3 py-2 text-xs
-                   border border-[#333] focus:outline-none focus:border-sky-500/40
-                   placeholder:text-gray-700 transition-all"
-          />
-          <p class="text-[10px] text-gray-700 mt-1.5">
-            Acepta: <span class="text-gray-600">track, album, playlist, artist, mix</span> — URL completa o shorthand como <code class="text-gray-500">album/123456</code>
-          </p>
-        </div>
-
-        <!-- Output dir + Quality -->
-        <div class="flex flex-col sm:flex-row gap-3">
-          <div class="flex-1">
-            <label class="text-[10px] font-bold text-sky-400/60 uppercase tracking-widest mb-1.5 block">Carpeta de destino</label>
-            <div class="flex gap-2">
-              <input
-                id="download-dir"
-                type="text"
-                placeholder="C:\Music\Tidal  (vacío = carpeta por defecto de tiddl)"
-                class="flex-1 bg-[#141414] text-gray-100 rounded-lg px-3 py-2 text-xs
-                       border border-[#333] focus:outline-none focus:border-sky-500/40
-                       placeholder:text-gray-700 transition-all"
-              />
-              <button
-                onclick="pickDownloadFolder()"
-                title="Abrir explorador de carpetas"
-                class="px-2.5 py-2 bg-[#141414] hover:bg-[#1E1E1E] rounded-lg text-gray-500
-                       hover:text-sky-400 border border-[#333] hover:border-sky-500/30
-                       transition-all shrink-0"
-                aria-label="Seleccionar carpeta de destino">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-          <div class="flex flex-col gap-3 sm:w-44">
-            <div>
-              <label class="text-[10px] font-bold text-sky-400/60 uppercase tracking-widest mb-1.5 block">Calidad de audio</label>
-              <select
-                id="dl-quality"
-                class="w-full bg-[#141414] text-gray-100 rounded-lg px-3 py-2 text-xs
-                       border border-[#333] focus:outline-none focus:border-sky-500/40 transition-all">
-                <option value="AUTO" selected>auto — detecta por tipo de URL</option>
-                <option value="MAX">max — Hi-Res 24-bit FLAC</option>
-                <option value="HIGH">high — Lossless 16-bit FLAC</option>
-                <option value="NORMAL">normal — 320 kbps AAC</option>
-                <option value="LOW">low — 96 kbps AAC</option>
-              </select>
-            </div>
-            <label class="flex items-center gap-2.5 cursor-pointer select-none group">
-              <div class="relative">
-                <input id="dl-cover" type="checkbox" checked class="sr-only peer">
-                <div class="w-8 h-4 rounded-full bg-[#2A2A2A] border border-[#333]
-                            peer-checked:bg-sky-500/30 peer-checked:border-sky-500/50 transition-all"></div>
-                <div class="absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-gray-600
-                            peer-checked:bg-sky-400 peer-checked:translate-x-4 transition-all"></div>
+            <!-- Playlist -->
+            <div class="p-4">
+              <div class="flex items-center justify-between mb-2">
+                <label for="playlist-select" class="text-[13px] font-medium">Playlist de tu cuenta</label>
+                <button onclick="loadPlaylists()" class="btn text-xs text-mute hover:text-[#D5DBDF] px-1.5 py-0.5 rounded">Recargar</button>
               </div>
-              <span class="text-[11px] text-gray-500 group-hover:text-gray-400 transition-colors">Descargar carátula</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Requisitos notice -->
-        <div class="flex items-start gap-2.5 bg-[#1A1A1A] border border-[#2A2A2A] rounded-xl px-3 py-2.5">
-          <svg class="w-3.5 h-3.5 text-amber-400/50 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          <p class="text-[10px] text-gray-600 leading-relaxed">
-            Requiere <code class="text-gray-500">pip install tiddl</code> (Python 3.13+),
-            autenticación con <code class="text-gray-500">tiddl auth login</code>
-            y <span class="text-gray-500">FFmpeg</span> instalado en el sistema.
-          </p>
-        </div>
-
-        <button
-          onclick="runDownload(this)"
-          class="btn-run w-full py-2.5 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400
-                 rounded-lg text-xs font-semibold border border-sky-500/20
-                 hover:border-sky-500/45 hover:shadow-[0_0_22px_rgba(14,165,233,0.18)]
-                 flex items-center justify-center gap-2 transition-all">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-          </svg>
-          Iniciar descarga
-        </button>
-
-      </div>
-    </section>
-
-    </div><!-- /LEFT -->
-
-    <!-- ══ RIGHT: panel de operaciones ══════════════════════════════ -->
-    <div class="mt-6 lg:mt-0 lg:sticky lg:top-[72px]">
-
-    <!-- ── Operation Panel ── -->
-    <section id="operation-panel" class="hidden lg:!block bg-[#161616] rounded-2xl border border-[#2A2A2A] overflow-hidden">
-
-      <!-- Idle state — visible cuando no hay ninguna herramienta corriendo -->
-      <div id="op-idle" class="flex flex-col items-center justify-center py-16 px-6 text-center select-none">
-        <div class="relative mb-7">
-          <div class="w-16 h-16 rounded-2xl bg-[#1A1A1A] border border-[#2A2A2A] flex items-center justify-center">
-            <svg class="w-8 h-8 text-gray-700" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 3v10.55A4 4 0 1014 17V7h4V3h-6z"/>
-            </svg>
-          </div>
-          <div class="wave-bars text-gray-700/50 absolute -bottom-5 left-1/2 -translate-x-1/2" aria-hidden="true">
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-          </div>
-        </div>
-        <p class="text-sm font-medium text-gray-600 mt-2">Panel de operaciones</p>
-        <p class="text-xs text-gray-700 mt-2 max-w-xs leading-relaxed">
-          Ejecuta una herramienta de la izquierda para ver la salida aquí
-        </p>
-        <div class="flex items-center gap-2 mt-7">
-          <span class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1A1A1A] border border-[#2A2A2A] text-[10px] text-gray-700">
-            <span class="w-3.5 h-3.5 rounded-full bg-[#00D4FF]/10 text-[#00D4FF]/60 text-[8px] font-bold flex items-center justify-center shrink-0">1</span>
-            Importar
-          </span>
-          <svg class="w-3 h-3 text-[#2A2A2A] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-          </svg>
-          <span class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1A1A1A] border border-[#2A2A2A] text-[10px] text-gray-700">
-            <span class="w-3.5 h-3.5 rounded-full bg-violet-500/10 text-violet-400/60 text-[8px] font-bold flex items-center justify-center shrink-0">2</span>
-            Optimizar
-          </span>
-          <svg class="w-3 h-3 text-[#2A2A2A] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-          </svg>
-          <span class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1A1A1A] border border-[#2A2A2A] text-[10px] text-gray-700">
-            <span class="w-3.5 h-3.5 rounded-full bg-sky-500/10 text-sky-400/60 text-[8px] font-bold flex items-center justify-center shrink-0">3</span>
-            Descargar
-          </span>
-        </div>
-      </div>
-
-      <!-- Header -->
-      <div class="px-5 pt-5 pb-4 border-b border-[#2A2A2A]">
-        <div class="flex items-center justify-between mb-3">
-          <div class="flex items-center gap-2.5">
-            <div id="op-icon" class="w-7 h-7 rounded-lg flex items-center justify-center">
-              <!-- Icon injected by JS -->
+              <div class="flex gap-2">
+                <select id="playlist-select" class="field flex-1 min-w-0 rounded-lg px-3 py-2.5 text-[13px]">
+                  <option value="">Cargando playlists…</option>
+                </select>
+                <button onclick="runDownloadPlaylist(this)" class="btn btn-run btn-quiet rounded-lg px-4 text-[13px] font-medium shrink-0">Descargar</button>
+              </div>
+              <p class="mt-2 text-xs text-mute leading-relaxed">Crea <code class="font-mono text-[11.5px] text-soft">playlists/&lt;nombre&gt;.m3u8</code> con el orden de Tidal.</p>
             </div>
-            <span id="op-title" class="text-sm font-semibold">Ejecutando...</span>
+
+            <!-- URL -->
+            <div class="p-4">
+              <label for="tidal-url" class="block text-[13px] font-medium mb-2">Por URL o ID</label>
+              <div class="flex gap-2">
+                <input id="tidal-url" type="text" spellcheck="false" autocomplete="off"
+                  placeholder="tidal.com/album/123 · playlist/… · track/456"
+                  class="field flex-1 min-w-0 rounded-lg px-3 py-2.5 text-[13px] font-mono">
+                <button onclick="runDownload(this)" class="btn btn-run btn-quiet rounded-lg px-4 text-[13px] font-medium shrink-0">Descargar</button>
+              </div>
+              <p class="mt-2 text-xs text-mute">Track, álbum, playlist, artista o mix.</p>
+            </div>
+
+            <!-- Carpeta -->
+            <div class="p-4">
+              <label for="download-dir" class="block text-[13px] font-medium mb-2">Carpeta de la biblioteca</label>
+              <div class="flex gap-2">
+                <input id="download-dir" type="text" spellcheck="false" placeholder="~/Music/Tidal"
+                  class="field flex-1 min-w-0 rounded-lg px-3 py-2.5 text-[13px] font-mono">
+                <button onclick="pickDownloadFolder()" aria-label="Elegir carpeta de la biblioteca" title="Elegir carpeta"
+                  class="btn btn-quiet rounded-lg px-3 shrink-0">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.5 7.5A1.5 1.5 0 015 6h4l2 2h8a1.5 1.5 0 011.5 1.5v8A1.5 1.5 0 0119 19H5a1.5 1.5 0 01-1.5-1.5v-10z"/>
+                  </svg>
+                </button>
+              </div>
+              <p class="mt-2 text-xs text-mute">Vacío usa <code class="font-mono text-[11.5px] text-soft">~/Music/Tidal</code>. Aplica a descargas, Hi-Res y teléfono.</p>
+            </div>
           </div>
-          <button
-            id="stop-btn"
-            onclick="stopOperation()"
-            class="text-xs text-gray-600 hover:text-red-400 transition-colors px-2 py-1
-                   rounded-lg hover:bg-red-400/10 hidden">
-            Detener
-          </button>
-        </div>
 
-        <!-- Progress bar -->
-        <div class="h-1.5 bg-[#1F1F1F] rounded-full overflow-hidden">
-          <div id="progress-bar" class="h-full rounded-full transition-all duration-500"></div>
-        </div>
-        <div class="flex justify-between mt-1.5">
-          <span id="progress-status" class="text-xs text-gray-600">Iniciando...</span>
-          <span id="progress-pct" class="text-xs text-gray-600"></span>
-        </div>
+          <!-- Utilidades -->
+          <div class="mt-3 grid sm:grid-cols-2 gap-3">
+            <div class="rounded-xl bg-panel border border-line p-4 flex flex-col">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-[13px] font-medium">Hi-Res</span>
+                <span id="hires-status" class="text-xs text-mute truncate">comprobando…</span>
+              </div>
+              <p class="mt-1.5 text-xs text-mute leading-relaxed flex-1">Baja otra vez en 24-bit los FLAC que Tidal tenga en Hi-Res. También corre tras cada descarga.</p>
+              <button onclick="runHires(this)" class="btn btn-run btn-accent mt-3 rounded-lg py-2 text-[13px] font-medium">Mejorar a Hi-Res</button>
+            </div>
+
+            <div class="rounded-xl bg-panel border border-line p-4 flex flex-col">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-[13px] font-medium">Teléfono</span>
+                <button id="phone-status" onclick="checkPhone()" title="Volver a comprobar"
+                  class="btn text-xs text-mute truncate hover:text-[#D5DBDF] rounded px-1">comprobando…</button>
+              </div>
+              <p class="mt-1.5 text-xs text-mute leading-relaxed flex-1">Copia por adb a <code class="font-mono text-[11px] text-soft">Download/Quick Share</code> lo nuevo y las playlists. No borra nada ni recupera lo que borraste.</p>
+              <div class="mt-3 flex items-center gap-3">
+                <button onclick="runPhoneSync(this)" class="btn btn-run btn-accent flex-1 rounded-lg py-2 text-[13px] font-medium">Enviar al teléfono</button>
+                <label class="flex items-center gap-1.5 text-xs text-mute cursor-pointer select-none">
+                  <input id="phone-simulate" type="checkbox" class="accent-[#7CC6D6] w-3.5 h-3.5"> simular
+                </label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Mantener My Tracks ───────────────────────────────── -->
+        <section aria-labelledby="t-mantener" class="reveal">
+          <div class="flex items-baseline justify-between mb-2">
+            <h2 id="t-mantener" class="text-lg font-semibold tracking-[-0.015em]">Ordenar My Tracks</h2>
+            <span class="text-xs text-mute">en tu cuenta de Tidal</span>
+          </div>
+
+          <div class="row py-4 flex items-start gap-4">
+            <div class="flex-1 min-w-0">
+              <h3 class="text-[14px] font-medium">Cambiar por versiones de mayor calidad</h3>
+              <p class="mt-1 text-[13px] text-mute leading-relaxed max-w-[52ch]">Busca cada favorito en Hi-Res o Lossless y sustituye el que tengas en menor calidad.</p>
+            </div>
+            <button onclick="runTool('quality', this)" class="btn btn-run btn-quiet rounded-lg px-4 py-2 text-[13px] font-medium shrink-0">Ejecutar</button>
+          </div>
+
+          <div class="row py-4 flex items-start gap-4">
+            <div class="flex-1 min-w-0">
+              <h3 class="text-[14px] font-medium">Quitar duplicados</h3>
+              <p class="mt-1 text-[13px] text-mute leading-relaxed max-w-[52ch]">Encuentra canciones repetidas en My Tracks, conserva la de mejor calidad y elimina el resto.</p>
+            </div>
+            <button onclick="runTool('dupes', this)" class="btn btn-run btn-quiet rounded-lg px-4 py-2 text-[13px] font-medium shrink-0">Ejecutar</button>
+          </div>
+        </section>
+
+        <!-- ── Importar música local ────────────────────────────── -->
+        <section aria-labelledby="t-importar" class="reveal">
+          <div class="flex items-baseline justify-between mb-2">
+            <h2 id="t-importar" class="text-lg font-semibold tracking-[-0.015em]">Importar música local</h2>
+            <span class="text-xs text-mute">de tu carpeta a My Tracks</span>
+          </div>
+          <p class="text-[13px] text-mute leading-relaxed max-w-[60ch] mb-4">
+            Busca en Tidal cada archivo con formato <code class="font-mono text-[12px] text-soft">Artista - Título.mp3</code> y lo agrega a tus favoritos si aún no está.
+          </p>
+          <label for="music-dir" class="block text-[13px] font-medium mb-2">Carpeta con tu música</label>
+          <div class="flex gap-2">
+            <input id="music-dir" type="text" spellcheck="false" placeholder="/home/usuario/Música"
+              class="field flex-1 min-w-0 rounded-lg px-3 py-2.5 text-[13px] font-mono">
+            <button id="pick-btn" onclick="pickFolder()" aria-label="Elegir carpeta con tu música" title="Elegir carpeta"
+              class="btn btn-quiet rounded-lg px-3 shrink-0">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.5 7.5A1.5 1.5 0 015 6h4l2 2h8a1.5 1.5 0 011.5 1.5v8A1.5 1.5 0 0119 19H5a1.5 1.5 0 01-1.5-1.5v-10z"/>
+              </svg>
+            </button>
+            <button id="save-btn" onclick="saveConfig()" class="btn btn-quiet rounded-lg px-3 text-[13px] shrink-0">Guardar</button>
+          </div>
+          <button onclick="runTool('sync', this)" class="btn btn-run btn-quiet mt-3 w-full rounded-lg py-2.5 text-[13px] font-medium">Sincronizar con Tidal</button>
+        </section>
+
+        <details class="reveal group text-xs text-mute">
+          <summary class="cursor-pointer select-none inline-flex items-center gap-1.5 hover:text-soft rounded">
+            <svg class="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6"/></svg>
+            Requisitos
+          </summary>
+          <ul class="mt-3 space-y-1.5 leading-relaxed pl-4 list-disc marker:text-[#3A424A]">
+            <li><code class="font-mono text-soft">tiddl</code> con sesión: <code class="font-mono text-soft">tiddl auth login</code>, y FFmpeg instalado.</li>
+            <li>Playlists y Hi-Res usan la sesión PKCE: <code class="font-mono text-soft">.venv/bin/python -m core.hires login</code> (una vez).</li>
+            <li>Teléfono: depuración USB activa y <code class="font-mono text-soft">adb</code> instalado.</li>
+            <li>Carátula, letras y Atmos se configuran en <code class="font-mono text-soft">~/.tiddl/config.toml</code>.</li>
+          </ul>
+        </details>
       </div>
 
-      <!-- Log Terminal -->
-      <div
-        id="log-output"
-        class="font-mono text-[11px] leading-relaxed text-gray-400 bg-black/40
-               px-5 py-4 h-72 lg:h-[460px] overflow-y-auto"
-      ></div>
+      <!-- ══ Columna derecha: panel de operaciones ══════════════════ -->
+      <aside aria-label="Panel de operaciones" class="lg:sticky lg:top-[76px]">
+        <section id="operation-panel" class="hidden lg:!block rounded-2xl bg-panel border border-line overflow-hidden">
 
-      <!-- Summary (hidden until done) -->
-      <div id="summary" class="hidden px-5 py-4 border-t border-[#2A2A2A]">
-        <div id="summary-content" class="flex flex-wrap gap-3"></div>
-      </div>
+          <!-- Sin operación -->
+          <div id="op-idle" class="px-7 py-14">
+            <p class="font-mono text-xs text-mute">$ en espera</p>
+            <h2 class="mt-3 text-xl font-semibold tracking-[-0.02em]">Aquí verás cada paso en vivo.</h2>
+            <p class="mt-2 text-[13px] text-mute leading-relaxed max-w-[44ch]">
+              Elige una acción a la izquierda. El registro muestra lo que se descarga, lo que se salta y cualquier error, y al final un resumen.
+            </p>
+            <ol class="mt-8 space-y-3 text-[13px]">
+              <li class="flex gap-3"><span class="font-mono text-mute w-5">01</span><span class="text-soft">Descarga My Tracks o una playlist</span></li>
+              <li class="flex gap-3"><span class="font-mono text-mute w-5">02</span><span class="text-soft">Las que Tidal tenga en Hi-Res se mejoran solas</span></li>
+              <li class="flex gap-3"><span class="font-mono text-mute w-5">03</span><span class="text-soft">Envía lo nuevo al teléfono</span></li>
+            </ol>
+          </div>
 
-    </section>
-    </div><!-- /RIGHT -->
+          <!-- Con operación -->
+          <div id="op-active" class="hidden">
+            <div class="px-5 pt-5 pb-4 border-b border-line">
+              <div class="flex items-center justify-between gap-3 mb-3">
+                <div class="flex items-center gap-2.5 min-w-0">
+                  <div id="op-icon" class="w-7 h-7 rounded-lg flex items-center justify-center"></div>
+                  <span id="op-title" class="text-[14px] font-semibold truncate"></span>
+                </div>
+                <button id="stop-btn" onclick="stopOperation()"
+                  class="btn hidden text-xs text-mute hover:text-[#E7A6A6] px-2.5 py-1 rounded-md hover:bg-[#E7A6A6]/10">Detener</button>
+              </div>
+              <div class="h-1 bg-raised rounded-full overflow-hidden">
+                <div id="progress-bar" class="h-full rounded-full"></div>
+              </div>
+              <div class="flex justify-between mt-2">
+                <span id="progress-status" class="text-xs text-mute"></span>
+                <span id="progress-pct" class="text-xs text-mute tabular-nums"></span>
+              </div>
+            </div>
 
-    </div><!-- /grid -->
+            <div id="log-output" aria-live="polite"
+              class="font-mono text-[11.5px] leading-[1.65] text-soft bg-[#0B0D0F] px-5 py-4 h-80 lg:h-[500px] overflow-y-auto"></div>
+          </div>
 
+          <div id="summary" class="hidden px-5 py-4 border-t border-line">
+            <div id="summary-content" class="flex flex-wrap gap-2"></div>
+          </div>
+        </section>
+      </aside>
+    </div>
   </main>
 
-  <!-- ── Footer ── -->
-  <footer class="relative z-10 text-center py-8 text-xs text-gray-700">
-    <div class="w-20 h-px bg-gradient-to-r from-transparent via-[#2A2A2A] to-transparent mx-auto mb-4"></div>
-    Tidal Library Tools &mdash; corre localmente en tu máquina
+  <footer class="relative z-10 max-w-[1320px] mx-auto px-5 sm:px-8 py-8 border-t border-line/60 text-xs text-mute flex flex-wrap justify-between gap-2">
+    <span>Tidal Library Tools corre solo en tu equipo.</span>
+    <span class="font-mono">localhost:5000</span>
   </footer>
 
   <script src="/static/js/app.js"></script>
