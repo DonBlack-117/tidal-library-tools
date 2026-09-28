@@ -4,40 +4,64 @@
 let activeReader   = null;   // ReadableStream reader
 let currentScript  = null;   // 'sync' | 'quality' | 'dupes'
 let stats          = {};     // counters extracted from log lines
+let progress       = { done: 0, total: 0 };   // descargas: "Downloaded" frente a "N por descargar"
+let existsDiv      = null;   // línea única que agrupa los "Exists …" de tiddl
+let existsCount    = 0;
+const BASE_TITLE   = document.title;
+
+function resetStats() {
+  stats = { added: 0, notFound: 0, errors: 0, improved: 0, removed: 0, downloaded: 0, skipped: 0 };
+  progress = { done: 0, total: 0 };
+}
+
+// Pide permiso de notificaciones la primera vez que se lanza algo (requiere un clic)
+function askNotify() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission().catch(() => {});
+  }
+}
 
 // ── Tool metadata ─────────────────────────────────────────────────────────────
+// Un solo acento (#7CC6D6); los iconos comparten trazo de 1.8
+const ICON_BG = 'bg-accent/10';
+const icon = d => `<svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" aria-hidden="true">
+             <path stroke-linecap="round" stroke-linejoin="round" d="${d}"/></svg>`;
+
 const TOOLS = {
   sync: {
-    title:    'Sincronizando música local → Tidal',
-    color:    'text-accent',
-    iconBg:   'bg-accent/10',
-    icon: `<svg class="w-4 h-4 text-[#00D4FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-             <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-           </svg>`,
+    title:  'Sincronizando música local con Tidal',
+    iconBg: ICON_BG,
+    icon:   icon('M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'),
   },
   quality: {
-    title:    'Mejorando calidad de audio',
-    color:    'text-emerald-400',
-    iconBg:   'bg-emerald-500/10',
-    icon: `<svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-             <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
-           </svg>`,
+    title:  'Cambiando por versiones de mayor calidad',
+    iconBg: ICON_BG,
+    icon:   icon('M9 19V6l12-3v13M9 19a3 2 0 11-6 0 3 2 0 016 0zm12-3a3 2 0 11-6 0 3 2 0 016 0zM9 10l12-3'),
   },
   dupes: {
-    title:    'Limpiando duplicados',
-    color:    'text-amber-400',
-    iconBg:   'bg-amber-500/10',
-    icon: `<svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-             <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-           </svg>`,
+    title:  'Quitando duplicados',
+    iconBg: ICON_BG,
+    icon:   icon('M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'),
   },
   download: {
-    title:    'Descargando de Tidal',
-    color:    'text-sky-400',
-    iconBg:   'bg-sky-500/10',
-    icon: `<svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-             <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-           </svg>`,
+    title:  'Descargando de Tidal',
+    iconBg: ICON_BG,
+    icon:   icon('M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14'),
+  },
+  playlist: {
+    title:  'Descargando playlist',
+    iconBg: ICON_BG,
+    icon:   icon('M4 6h11M4 12h11M4 18h7m9-9v8.5a2 2 0 11-2-2h2'),
+  },
+  hires: {
+    title:  'Mejorando a Hi-Res',
+    iconBg: ICON_BG,
+    icon:   icon('M3 12h2l2-6 3 12 3-9 2 5 2-2h4'),
+  },
+  phone: {
+    title:  'Enviando al teléfono',
+    iconBg: ICON_BG,
+    icon:   icon('M8 3h8a1.5 1.5 0 011.5 1.5v15A1.5 1.5 0 0116 21H8a1.5 1.5 0 01-1.5-1.5v-15A1.5 1.5 0 018 3zm3 15h2'),
   },
 };
 
@@ -52,8 +76,8 @@ async function runTool(toolName, btn) {
   const meta    = TOOLS[toolName];
   const musicDir = document.getElementById('music-dir').value.trim();
 
-  // Reset stats
-  stats = { added: 0, notFound: 0, errors: 0, improved: 0, removed: 0 };
+  resetStats();
+  askNotify();
 
   // ── Disable all run buttons
   document.querySelectorAll('.btn-run').forEach(b => b.disabled = true);
@@ -132,10 +156,13 @@ function setupPanel(meta) {
   panel.classList.remove('hidden');
 
   document.getElementById('op-idle')?.classList.add('hidden');
+  document.getElementById('op-active')?.classList.remove('hidden');
   document.getElementById('op-title').textContent    = meta.title;
   document.getElementById('op-icon').className       = `w-7 h-7 rounded-lg flex items-center justify-center ${meta.iconBg}`;
   document.getElementById('op-icon').innerHTML       = meta.icon;
   document.getElementById('log-output').innerHTML    = '';
+  existsDiv = null;
+  existsCount = 0;
   document.getElementById('summary').classList.add('hidden');
   document.getElementById('summary-content').innerHTML = '';
 
@@ -157,20 +184,54 @@ function processLine(line) {
     setSession('ok', 'Completado');
   }
 
-  // Count stats
+  // Herramientas de la etapa 2 y de importación
   if (line.includes('➕') || line.includes('Agregada')) stats.added++;
   if (line.includes('❌ No encontrada'))                 stats.notFound++;
-  if (line.includes('⚠️') && line.includes('Error'))    stats.errors++;
   if (line.includes('✅ Mejoradas'))                     tryExtract(line, 'improved');
   if (line.includes('✅ Total eliminados'))              tryExtract(line, 'removed');
 
-  // Stats de descarga (tiddl)
-  if (currentScript === 'download') {
-    if (/downloaded|descarg/i.test(line))                stats.downloaded = (stats.downloaded || 0) + 1;
-    if (/skip|exist|omit/i.test(line))                   stats.skipped    = (stats.skipped    || 0) + 1;
-  }
+  // Errores (sin contar los "no encontrada", que ya tienen su cifra)
+  if (/^(Error|API Error|Can't stream)/.test(line) ||
+      (line.includes('❌') && !line.includes('No encontrada')) ||
+      (line.includes('⚠️') && line.includes('Error'))) stats.errors++;
+
+  // Descargas, playlists, Hi-Res y teléfono: cifras que escriben core/*.py
+  let m;
+  if (/^(Downloaded|Overwrited) /.test(line)) { stats.downloaded++; progress.done++; showDownloadProgress(); }
+  if ((m = line.match(/(\d+) por (descargar|copiar)/)))  { progress.total = +m[1]; progress.done = 0; showDownloadProgress(); }
+  if ((m = line.match(/(\d+) ya descargad/)))              stats.already     = +m[1];
+  if ((m = line.match(/(\d+) no disponibles/)))            stats.unavailable = +m[1];
+  if ((m = line.match(/^📂 (\d+) canci/)))                 stats.newSongs    = +m[1];
+  if ((m = line.match(/^↩ (\d+) descartada/)))             stats.discarded   = +m[1];
+  if ((m = line.match(/Hi-Res: (\d+) mejorada/)))          stats.hires       = +m[1];
+  if ((m = line.match(/Copiados (\d+)/)))                  stats.copied      = +m[1];
+  if ((m = line.match(/^🗑 (\d+) borrada/)))               stats.phoneDeleted = +m[1];
+  if ((m = line.match(/Lista con (\d+) canciones/)))       stats.inList      = +m[1];
+
+  // Avance "n/total": mueve la barra y no se escribe en el log
+  if ((m = line.match(/^\s*(\d+)\/(\d+)\s*$/))) { setProgressValue(+m[1], +m[2]); return; }
+
+  // tiddl repite "Exists …" por cada archivo ya presente: se agrupa en una línea
+  if (/^(Exists|Skipping) /.test(line)) { stats.skipped++; collapseExists(); return; }
+
+  // Ruido sin valor para el usuario
+  if (/^(Auth token expires|Loaded \d+ resources|Tracks: \d+$|Total downloads: )/.test(line)) return;
 
   appendLog(line);
+}
+
+function collapseExists() {
+  existsCount++;
+  if (!existsDiv) {
+    existsDiv = document.createElement('div');
+    existsDiv.className = 'log-line text-mute';
+    document.getElementById('log-output').appendChild(existsDiv);
+  }
+  existsDiv.textContent = `· ${existsCount} ya estaban en disco (se omiten del registro)`;
+}
+
+function showDownloadProgress() {
+  if (progress.total > 0) setProgressValue(Math.min(progress.done, progress.total), progress.total);
 }
 
 function tryExtract(line, key) {
@@ -188,23 +249,24 @@ function appendLog(line, forceType) {
   el.scrollTop = el.scrollHeight;
 }
 
-function colorFor(line, forceType) {
-  if (forceType === 'error') return 'text-red-400';
-  if (forceType === 'warn')  return 'text-amber-400';
+// Colores de estado desaturados: solo para ok / aviso / error
+const C_OK = 'text-[#9FD6B4]', C_WARN = 'text-[#E3C38A]', C_ERR = 'text-[#E7A6A6]';
 
-  if (line.includes('✅') || line.includes('➕') || line.includes('Sesión iniciada'))
-    return 'text-emerald-400';
+function colorFor(line, forceType) {
+  if (forceType === 'error') return C_ERR;
+  if (forceType === 'warn')  return C_WARN;
+
+  if (line.includes('✅') || line.includes('➕') || line.includes('⬆') || line.includes('Sesión iniciada'))
+    return C_OK;
   if (line.includes('❌') || line.includes('✗ Eliminar'))
-    return 'text-red-400';
-  if (line.includes('⚠️') || line.includes('⚡'))
-    return 'text-amber-400';
+    return C_ERR;
+  if (line.includes('⚠') || line.includes('⚡'))
+    return C_WARN;
   if (line.startsWith('==') || line.startsWith('--') || line.includes('RESUMEN'))
-    return 'text-gray-600';
-  if (line.match(/^\s*\[?\d+\/\d+\]?/))
-    return 'text-gray-500';
-  if (line.includes('✓') || line.includes('Ya existe'))
-    return 'text-gray-500';
-  return 'text-gray-300';
+    return 'text-[#59616A]';
+  if (line.match(/^\s*\[?\d+\/\d+\]?/) || line.includes('✓') || line.includes('Ya existe') || /^(Exists|Skipping) /.test(line))
+    return 'text-mute';
+  return 'text-soft';
 }
 
 // ── Progress bar helpers ──────────────────────────────────────────────────────
@@ -216,11 +278,25 @@ function setProgressIndeterminate() {
   document.getElementById('progress-pct').textContent    = '';
 }
 
+// Progreso real cuando el proceso informa "n/total"
+function setProgressValue(done, total) {
+  if (!total) return;
+  const pct = Math.round((done / total) * 100);
+  const bar = document.getElementById('progress-bar');
+  bar.className   = 'h-full rounded-full bg-accent transition-[width] duration-300 ease-out';
+  bar.style.width = `${pct}%`;
+  document.getElementById('progress-status').textContent = `${done} de ${total}`;
+  document.getElementById('progress-pct').textContent    = `${pct}%`;
+  document.title = `${pct}% · ${BASE_TITLE}`;
+}
+
 function setProgressDone(success) {
   const bar = document.getElementById('progress-bar');
-  bar.className = `h-full rounded-full transition-all duration-500 ${success ? 'bg-emerald-500' : 'bg-red-500'}`;
+  bar.className = `h-full rounded-full transition-all duration-500 ${success ? 'bg-[#9FD6B4]' : 'bg-[#E7A6A6]'}`;
   bar.style.width = '100%';
   document.getElementById('progress-status').textContent = success ? 'Completado' : 'Finalizado con errores';
+  document.getElementById('progress-pct').textContent = '';
+  document.title = BASE_TITLE;
 }
 
 // ── Finish operation ──────────────────────────────────────────────────────────
@@ -236,7 +312,23 @@ function finishOperation(success) {
 
   setSession(success ? 'ok' : 'error', success ? 'Completado' : 'Finalizado');
 
-  renderSummary(success);
+  const resumen = renderSummary(success);
+  notifyDone(success, resumen);
+
+  // La biblioteca y el teléfono pueden haber cambiado
+  loadLibraryStats();
+  checkPhone();
+}
+
+// Notificación del sistema si la pestaña no está a la vista
+function notifyDone(success, resumen) {
+  if (!('Notification' in window) || Notification.permission !== 'granted' || !document.hidden) return;
+  const title = document.getElementById('op-title').textContent || 'Tidal Library Tools';
+  try {
+    new Notification(success ? title : `${title}: terminó con errores`, {
+      body: resumen, icon: '/static/img/icontidal.png', tag: 'tidal-op',
+    });
+  } catch (_) {}
 }
 
 // ── Summary cards ─────────────────────────────────────────────────────────────
@@ -245,35 +337,42 @@ function renderSummary(success) {
   container.innerHTML = '';
 
   const items = [];
+  const add = (value, label, color) => { if (value > 0) items.push({ value, label, color }); };
 
-  if (stats.added      > 0) items.push({ label: 'Agregadas',       value: stats.added,      color: 'text-emerald-400', bg: 'bg-emerald-500/10' });
-  if (stats.notFound   > 0) items.push({ label: 'No encontradas',  value: stats.notFound,   color: 'text-red-400',     bg: 'bg-red-500/10'     });
-  if (stats.improved   > 0) items.push({ label: 'Mejoradas',       value: stats.improved,   color: 'text-emerald-400', bg: 'bg-emerald-500/10' });
-  if (stats.removed    > 0) items.push({ label: 'Eliminadas',      value: stats.removed,    color: 'text-amber-400',   bg: 'bg-amber-500/10'   });
-  if (stats.downloaded > 0) items.push({ label: 'Descargadas',     value: stats.downloaded, color: 'text-sky-400',     bg: 'bg-sky-500/10'     });
-  if (stats.skipped    > 0) items.push({ label: 'Omitidas',        value: stats.skipped,    color: 'text-gray-400',    bg: 'bg-gray-500/10'    });
-  if (stats.errors     > 0) items.push({ label: 'Errores',         value: stats.errors,     color: 'text-red-400',     bg: 'bg-red-500/10'     });
+  // Canciones nuevas: la cifra del aplanado es la real; si no la hay, las de tiddl
+  const nuevas = stats.newSongs ?? stats.downloaded;
+
+  add(nuevas,             'nuevas',                  'text-accent');
+  add(stats.hires,        'a Hi-Res',                C_OK);
+  add(stats.copied,       'copiadas al teléfono',    'text-accent');
+  add(stats.inList,       'en la playlist',          'text-soft');
+  add(stats.already ?? stats.skipped, 'ya estaban',  'text-soft');
+  add(stats.discarded,    'repetidas descartadas',   'text-soft');
+  add(stats.phoneDeleted, 'borradas en el teléfono', 'text-soft');
+  add(stats.unavailable,  'no disponibles',          C_WARN);
+  add(stats.added,        'agregadas',               C_OK);
+  add(stats.improved,     'mejoradas',               C_OK);
+  add(stats.removed,      'eliminadas',              C_WARN);
+  add(stats.notFound,     'no encontradas',          C_ERR);
+  add(stats.errors,       'errores',                 C_ERR);
 
   if (items.length === 0) {
-    items.push({
-      label: success ? 'Sin cambios' : 'Proceso finalizado',
-      value: '',
-      color: 'text-gray-400',
-      bg: 'bg-gray-500/10',
-    });
+    items.push({ label: success ? 'Sin cambios' : 'Proceso finalizado', value: '', color: 'text-soft' });
   }
 
   for (const item of items) {
     const chip = document.createElement('div');
-    chip.className = `flex items-center gap-2 px-3 py-2 rounded-xl ${item.bg}`;
+    chip.className = 'flex items-baseline gap-2 px-3 py-2 rounded-lg bg-raised';
     chip.innerHTML = `
-      <span class="text-lg font-bold ${item.color}">${item.value}</span>
-      <span class="text-xs text-gray-500">${item.label}</span>
+      <span class="text-base font-semibold tabular-nums ${item.color}">${item.value}</span>
+      <span class="text-xs text-mute">${item.label}</span>
     `;
     container.appendChild(chip);
   }
 
   document.getElementById('summary').classList.remove('hidden');
+  // Texto para la notificación: "12 nuevas · 3 a Hi-Res · 970 ya estaban"
+  return items.map(i => `${i.value} ${i.label}`.trim()).join(' · ');
 }
 
 // ── Stop operation ────────────────────────────────────────────────────────────
@@ -292,13 +391,13 @@ function setSession(state, label) {
   const text = document.getElementById('session-label');
 
   const map = {
-    idle:    'bg-gray-600',
-    loading: 'bg-amber-400 animate-pulse dot-loading',
-    ok:      'bg-emerald-400 dot-ok',
-    error:   'bg-red-400 dot-error',
+    idle:    'bg-[#4A525A]',
+    loading: 'bg-[#E3C38A] animate-pulse',
+    ok:      'bg-[#9FD6B4]',
+    error:   'bg-[#E7A6A6]',
   };
 
-  dot.className  = `w-2 h-2 rounded-full transition-all duration-500 ${map[state] || map.idle}`;
+  dot.className  = `w-2 h-2 rounded-full transition-colors duration-500 ${map[state] || map.idle}`;
   text.textContent = label;
 }
 
@@ -309,11 +408,11 @@ function saveConfig() {
 
   const btn = document.getElementById('save-btn');
   const original = btn.textContent;
-  btn.textContent = '✓ Guardado';
-  btn.classList.add('text-emerald-400');
+  btn.textContent = 'Guardado';
+  btn.classList.add('text-[#9FD6B4]');
   setTimeout(() => {
     btn.textContent = original;
-    btn.classList.remove('text-emerald-400');
+    btn.classList.remove('text-[#9FD6B4]');
   }, 1500);
 }
 
@@ -362,22 +461,21 @@ async function exitApp() {
 
   // Reemplaza la página con un mensaje de cierre limpio
   document.body.innerHTML = `
-    <div class="min-h-screen bg-[#0D0D0D] flex flex-col items-center justify-center gap-4 text-gray-500">
-      <svg class="w-10 h-10 text-gray-700" fill="currentColor" viewBox="0 0 24 24">
-        <path d="M12 3v10.55A4 4 0 1014 17V7h4V3h-6z"/>
-      </svg>
-      <p class="text-sm">Servidor cerrado. Puedes cerrar esta pestaña.</p>
-    </div>`;
+    <main class="min-h-[100dvh] bg-ink font-sans flex flex-col items-center justify-center gap-2 text-center px-6">
+      <p class="font-mono text-xs text-mute">$ servidor detenido</p>
+      <p class="text-lg font-semibold text-[#E7EBEE] tracking-[-0.015em]">Puedes cerrar esta pestaña.</p>
+      <p class="text-[13px] text-mute">Para volver a abrirlo: <code class="font-mono">python app.py</code></p>
+    </main>`;
 }
 
 // ── Descarga desde Tidal (tiddl) ──────────────────────────────────────────────
+// Siempre en calidad máxima; metadatos, letras y carátula se configuran en
+// ~/.tiddl/config.toml. El servidor envía el código de salida real de tiddl.
 async function runDownload(btn) {
   if (activeReader) return;
 
-  const url     = document.getElementById('tidal-url').value.trim();
-  const outDir  = document.getElementById('download-dir').value.trim();
-  const quality = document.getElementById('dl-quality').value;
-  const cover   = document.getElementById('dl-cover').checked;
+  const url    = document.getElementById('tidal-url').value.trim();
+  const outDir = document.getElementById('download-dir').value.trim();
 
   if (!url) {
     const input = document.getElementById('tidal-url');
@@ -386,19 +484,142 @@ async function runDownload(btn) {
     return;
   }
 
+  await streamDownload('/run/download', { tidal_url: url, output_dir: outDir }, 'Descargando de Tidal');
+}
+
+// Un clic: todas las pistas favoritas (My Tracks). Sin carpeta → ~/Music/Tidal
+async function runDownloadMyTracks(btn) {
+  if (activeReader) return;
+
+  const outDir = document.getElementById('download-dir').value.trim();
+  await streamDownload('/run/download-mytracks', { output_dir: outDir }, 'Descargando My Tracks');
+}
+
+// Playlist elegida de la lista (propias y favoritas). Solo baja lo que falta y crea el .m3u8
+async function runDownloadPlaylist(btn) {
+  if (activeReader) return;
+
+  const select = document.getElementById('playlist-select');
+  if (!select.value) {
+    select.classList.add('border-red-500/50');
+    setTimeout(() => select.classList.remove('border-red-500/50'), 1500);
+    return;
+  }
+  const outDir = document.getElementById('download-dir').value.trim();
+  const name   = select.options[select.selectedIndex].dataset.name || select.value;
+  await streamDownload('/run/download-playlist', { playlist: select.value, output_dir: outDir },
+                       `Playlist: ${name}`, 'playlist');
+}
+
+async function runHires(btn) {
+  if (activeReader) return;
+  const outDir = document.getElementById('download-dir').value.trim();
+  await streamDownload('/run/hires', { output_dir: outDir }, 'Mejorando a Hi-Res', 'hires');
+}
+
+async function runPhoneSync(btn) {
+  if (activeReader) return;
+  const outDir  = document.getElementById('download-dir').value.trim();
+  const simular = document.getElementById('phone-simulate').checked;
+  await streamDownload('/run/phone-sync', { output_dir: outDir, simular },
+                       simular ? 'Teléfono (simulación)' : 'Enviando al teléfono', 'phone');
+  checkPhone();
+}
+
+async function loadPlaylists() {
+  const select = document.getElementById('playlist-select');
+  if (!select) return;
+  select.innerHTML = '<option value="">Cargando playlists…</option>';
+  try {
+    const res  = await fetch('/playlists');
+    const data = await res.json();
+    if (!data.ok) {
+      select.innerHTML = `<option value="">${data.message}</option>`;
+      return;
+    }
+    select.innerHTML = '<option value="">Elige una playlist…</option>';
+    for (const p of data.playlists) {
+      const opt = document.createElement('option');
+      opt.value        = p.id;
+      opt.dataset.name = p.name;
+      opt.textContent  = `${p.name} (${p.tracks})`;
+      select.appendChild(opt);
+    }
+  } catch (_) {
+    select.innerHTML = '<option value="">No se pudieron cargar</option>';
+  }
+}
+
+function setMiniStatus(id, ok, text, hint) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle ${ok ? 'bg-[#9FD6B4]' : 'bg-[#E3C38A]'}"></span>`;
+  el.append(text);
+  el.title = hint || text;
+  el.classList.toggle('text-soft', ok);
+  el.classList.toggle('text-[#E3C38A]', !ok);
+  el.classList.remove('text-mute');
+}
+
+async function checkHires() {
+  try {
+    const data = await (await fetch('/check-hires')).json();
+    setMiniStatus('hires-status', data.ok, data.ok ? 'sesión activa' : 'sin sesión', data.message);
+  } catch (_) {}
+}
+
+function libDir() {
+  return encodeURIComponent(document.getElementById('download-dir')?.value.trim() || '');
+}
+
+async function checkPhone() {
+  const cell = document.getElementById('lib-phone');
+  try {
+    const data = await (await fetch(`/check-phone?output_dir=${libDir()}`)).json();
+    setMiniStatus('phone-status', data.ok, data.message, data.hint);
+    if (!cell) return;
+    if (!data.ok) {
+      cell.textContent = 'sin conectar';
+      cell.className = 'font-mono text-[15px] font-medium mt-0.5 text-mute';
+    } else if (data.pending > 0) {
+      cell.textContent = `${data.pending} por enviar`;
+      cell.className = 'font-mono text-[15px] font-medium mt-0.5 text-[#E3C38A]';
+    } else {
+      cell.textContent = 'al día';
+      cell.className = 'font-mono text-[15px] font-medium mt-0.5 text-[#9FD6B4]';
+    }
+  } catch (_) {}
+}
+
+async function loadLibraryStats() {
+  try {
+    const s = await (await fetch(`/library-stats?output_dir=${libDir()}`)).json();
+    const nf = new Intl.NumberFormat('es-MX');
+    const pct = s.canciones ? Math.round((s.hires / s.canciones) * 100) : 0;
+    document.getElementById('lib-songs').textContent     = nf.format(s.canciones);
+    document.getElementById('lib-hires').textContent     = `${nf.format(s.hires)} (${pct}%)`;
+    document.getElementById('lib-lyrics').textContent    = nf.format(s.letras);
+    document.getElementById('lib-playlists').textContent = nf.format(s.playlists.length);
+    document.getElementById('lib-playlists').title       = s.playlists.join(', ');
+    document.getElementById('lib-size').textContent      = `${s.gb} GB`;
+  } catch (_) {}
+}
+
+async function streamDownload(endpoint, body, title, kind = 'download') {
   currentScript = 'download';
-  stats = { added: 0, notFound: 0, errors: 0, downloaded: 0, skipped: 0 };
+  resetStats();
+  askNotify();
 
   document.querySelectorAll('.btn-run').forEach(b => b.disabled = true);
-  setupPanel(TOOLS['download']);
+  setupPanel({ ...(TOOLS[kind] || TOOLS.download), title });
   setSession('loading', 'Iniciando descarga...');
 
   let response;
   try {
-    response = await fetch('/run/download', {
+    response = await fetch(endpoint, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ tidal_url: url, output_dir: outDir, quality, cover }),
+      body:    JSON.stringify(body),
     });
   } catch (e) {
     appendLog(`❌ No se pudo conectar con el servidor: ${e.message}`, 'error');
@@ -435,7 +656,11 @@ async function runDownload(btn) {
         try {
           const data = JSON.parse(line.slice(6));
           if (data.line !== undefined) processLine(data.line);
-          if (data.done) { finishOperation(data.code === 0); return; }
+          if (data.done) {
+            if (data.code !== 0) appendLog(`❌ El proceso terminó con código ${data.code}`, 'error');
+            finishOperation(data.code === 0);
+            return;
+          }
         } catch (_) {}
       }
     }
@@ -464,20 +689,34 @@ async function checkTiddlStatus() {
   try {
     const res  = await fetch('/check-tiddl');
     const data = await res.json();
-    badge.classList.remove('opacity-0');
+    const base = 'hidden sm:flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border border-line transition-opacity duration-500';
     if (data.ok) {
-      badge.className = 'hidden sm:flex items-center gap-1.5 text-xs text-emerald-400/70 bg-emerald-500/[0.08] px-3 py-1.5 rounded-lg border border-emerald-500/15 transition-opacity duration-700';
-      badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 inline-block"></span> tiddl autenticado';
+      badge.className = `${base} text-soft`;
+      badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-[#9FD6B4]"></span> tiddl conectado';
     } else {
-      badge.className = 'hidden sm:flex items-center gap-1.5 text-xs text-amber-400/70 bg-amber-500/[0.08] px-3 py-1.5 rounded-lg border border-amber-500/15 transition-opacity duration-700';
-      badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 inline-block"></span> Ejecuta: tiddl auth login';
+      badge.className = `${base} text-[#E3C38A]`;
+      badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-[#E3C38A]"></span> falta tiddl auth login';
     }
   } catch (_) {}
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+function isWindowsPath(p) {
+  return /^[A-Za-z]:[\\\/]/.test(p);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const saved = localStorage.getItem('tidal_music_dir');
-  if (saved) document.getElementById('music-dir').value = saved;
+  if (saved && !isWindowsPath(saved)) {
+    document.getElementById('music-dir').value = saved;
+  } else if (saved && isWindowsPath(saved)) {
+    localStorage.removeItem('tidal_music_dir');
+  }
   checkTiddlStatus();
+  checkHires();
+  checkPhone();
+  loadPlaylists();
+  loadLibraryStats();
+  // Si cambia la carpeta de la biblioteca, las cifras también
+  document.getElementById('download-dir')?.addEventListener('change', () => { loadLibraryStats(); checkPhone(); });
 });
