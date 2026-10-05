@@ -21,6 +21,7 @@ tidal-session.json
 # Archivos de log y resultados locales
 logs/*.txt
 logs/*.log
+logs/*.tsv
 !logs/.gitkeep
 
 # IDEs
@@ -32,3 +33,9 @@ logs/*.log
 # OS
 .DS_Store
 Thumbs.db
+
+# Pruebas
+.pytest_cache/
+.coverage
+htmlcov/
+test-results/
