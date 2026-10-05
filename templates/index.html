@@ -7,105 +7,7 @@
   <meta name="description" content="Descarga, mejora y sincroniza tu biblioteca de Tidal en local.">
   <meta name="theme-color" content="#0E1012">
   <link rel="icon" type="image/png" href="/static/img/icontidal.png">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            ink:    '#0E1012',   // fondo
-            panel:  '#14171A',   // superficies
-            raised: '#1A1E22',   // controles
-            line:   '#252A2F',   // bordes
-            mute:   '#7D868F',   // texto secundario
-            soft:   '#A9B1B8',   // texto de apoyo
-            accent: '#7CC6D6',   // único acento
-          },
-          fontFamily: {
-            sans: ['Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-            mono: ['"Geist Mono"', 'ui-monospace', 'monospace'],
-          },
-        },
-      },
-    };
-  </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <style>
-    :root { color-scheme: dark; }
-    html { scroll-behavior: smooth; }
-    body { font-feature-settings: "ss01", "cv11"; -webkit-font-smoothing: antialiased; }
-    h1, h2, h3, p { text-wrap: pretty; }
-    h1, h2 { text-wrap: balance; }
-
-    /* Grano: rompe la planitud del fondo sin pesar */
-    .grain {
-      position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: .05;
-      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-    }
-    /* Luz ambiental única, fija, sin animar */
-    .ambient {
-      position: fixed; inset: -20% -10% auto auto; width: 60vw; height: 60vw; z-index: 0; pointer-events: none;
-      background: radial-gradient(closest-side, rgba(124,198,214,.07), transparent 70%);
-    }
-
-    /* Controles */
-    .field {
-      background: #1A1E22; border: 1px solid #252A2F; color: #E7EBEE;
-      transition: border-color .18s ease, background-color .18s ease;
-    }
-    .field::placeholder { color: #59616A; }
-    .field:hover { border-color: #313840; }
-    .field:focus { outline: none; border-color: rgba(124,198,214,.55); background: #1C2126; }
-    select.field { appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%237D868F' stroke-width='1.6'><path d='M3 4.5l3 3 3-3'/></svg>"); background-repeat: no-repeat; background-position: right .75rem center; padding-right: 2rem; }
-
-    .btn {
-      transition: background-color .18s ease, border-color .18s ease, color .18s ease, transform .12s ease;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .btn:not(:disabled):active { transform: scale(.98); }
-    .btn:disabled { opacity: .38; cursor: not-allowed; }
-    .btn-primary { background: #E7EBEE; color: #0E1012; }
-    .btn-primary:not(:disabled):hover { background: #FFFFFF; }
-    .btn-quiet { background: #1A1E22; border: 1px solid #252A2F; color: #D5DBDF; }
-    .btn-quiet:not(:disabled):hover { border-color: #3A424A; background: #1E2327; }
-    .btn-accent { background: rgba(124,198,214,.12); border: 1px solid rgba(124,198,214,.28); color: #A9DCE7; }
-    .btn-accent:not(:disabled):hover { background: rgba(124,198,214,.18); border-color: rgba(124,198,214,.5); }
-
-    :focus-visible { outline: 2px solid rgba(124,198,214,.8); outline-offset: 2px; border-radius: 8px; }
-
-    /* Filas de herramientas: separadas por línea, sin tarjeta */
-    .row + .row { border-top: 1px solid #1F2428; }
-
-    /* Log */
-    #log-output { font-variant-numeric: tabular-nums; scrollbar-width: thin; scrollbar-color: #2C3237 transparent; }
-    .log-line { animation: line-in .14s ease-out; }
-    @keyframes line-in { from { opacity: 0; transform: translateY(2px); } }
-
-    /* Barra de progreso (JS usa .progress-indeterminate) */
-    .progress-indeterminate {
-      background: linear-gradient(90deg, transparent, #7CC6D6 45%, transparent);
-      background-size: 40% 100%; background-repeat: no-repeat;
-      animation: sweep 1.4s cubic-bezier(.45,.05,.55,.95) infinite;
-    }
-    @keyframes sweep { from { background-position: -40% 0; } to { background-position: 140% 0; } }
-
-    /* Entrada escalonada, una sola vez */
-    .reveal { opacity: 0; animation: reveal .5s cubic-bezier(.2,.7,.2,1) forwards; }
-    .reveal:nth-child(2) { animation-delay: .06s; }
-    .reveal:nth-child(3) { animation-delay: .12s; }
-    .reveal:nth-child(4) { animation-delay: .18s; }
-    @keyframes reveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-
-    #summary-content > div { animation: reveal .3s cubic-bezier(.2,.7,.2,1) both; }
-
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { animation: none !important; transition: none !important; }
-      .reveal { opacity: 1; }
-      html { scroll-behavior: auto; }
-    }
-  </style>
+  <link rel="stylesheet" href="/static/css/app.css">
 </head>
 
 <body class="bg-ink text-[#E7EBEE] font-sans min-h-[100dvh] overflow-x-hidden">
@@ -127,7 +29,7 @@
           <span id="session-dot" class="w-2 h-2 rounded-full bg-[#4A525A]"></span>
           <span id="session-label" class="text-xs text-mute">Listo</span>
         </div>
-        <button id="exit-btn" onclick="exitApp()" title="Cerrar el servidor"
+        <button id="exit-btn" data-action="exit" title="Cerrar el servidor"
           class="btn text-xs text-mute hover:text-[#E7A6A6] px-2.5 py-1.5 rounded-md hover:bg-[#E7A6A6]/10">
           Salir
         </button>
@@ -170,12 +72,49 @@
             <span class="text-xs text-mute">calidad máxima · salta lo que ya tienes</span>
           </div>
 
-          <!-- Acción principal -->
-          <button id="mytracks-btn" onclick="runDownloadMyTracks(this)"
-            class="btn btn-run btn-primary w-full rounded-xl px-5 py-4 flex items-center justify-between gap-4 text-left">
+          <!-- Pegar un link -->
+          <form id="link-form" class="rounded-xl bg-panel border border-line p-4" novalidate>
+            <label for="link-input" class="block text-[13px] font-medium mb-2">Pega un link de Tidal</label>
+            <div class="flex gap-2">
+              <input id="link-input" data-testid="link-input" type="text" spellcheck="false" autocomplete="off"
+                inputmode="url" aria-describedby="link-hint link-error"
+                placeholder="tidal.com/track/… · álbum · playlist · artista · mix"
+                class="field flex-1 min-w-0 rounded-lg px-3 py-2.5 text-[13px] font-mono">
+              <button type="submit" id="link-check" class="btn btn-quiet rounded-lg px-4 text-[13px] font-medium shrink-0">Revisar</button>
+            </div>
+            <p id="link-hint" class="mt-2 text-xs text-mute leading-relaxed">
+              Sirve el link, el texto que copia «Compartir» en la app o solo el ID.
+              También puedes pegarlo con <kbd class="font-mono text-[11px] text-soft">Ctrl+V</kbd> en cualquier parte de la página.
+            </p>
+            <p id="link-error" data-testid="link-error" role="alert" class="hidden mt-2 text-xs text-[#E7A6A6]"></p>
+
+            <!-- Vista previa: qué es, cuántas tienes y cuántas faltan -->
+            <div id="preview" data-testid="preview" class="hidden mt-4 rounded-lg bg-raised border border-line p-4" aria-live="polite">
+              <p id="preview-type" class="text-xs text-accent font-medium"></p>
+              <h3 id="preview-name" class="mt-1 text-[15px] font-semibold leading-snug break-words"></h3>
+              <p id="preview-detail" class="text-[13px] text-mute"></p>
+              <dl class="mt-3 grid grid-cols-3 gap-2 text-center">
+                <div class="rounded-md bg-panel px-2 py-2"><dt class="text-[11px] text-mute">Por descargar</dt><dd id="preview-pending" class="font-mono text-[15px] font-medium tabular-nums text-accent">0</dd></div>
+                <div class="rounded-md bg-panel px-2 py-2"><dt class="text-[11px] text-mute">Ya las tienes</dt><dd id="preview-have" class="font-mono text-[15px] font-medium tabular-nums">0</dd></div>
+                <div class="rounded-md bg-panel px-2 py-2"><dt class="text-[11px] text-mute">No disponibles</dt><dd id="preview-unavailable" class="font-mono text-[15px] font-medium tabular-nums">0</dd></div>
+              </dl>
+              <ul id="preview-sample" class="mt-3 space-y-0.5 text-xs text-soft"></ul>
+              <p id="preview-warning" data-testid="preview-warning" class="hidden mt-3 text-xs text-[#E3C38A] leading-relaxed"></p>
+              <div class="mt-4 flex gap-2">
+                <button type="button" id="preview-download" data-testid="preview-download"
+                  class="btn btn-run btn-primary flex-1 rounded-lg py-2.5 text-[13px] font-semibold"></button>
+                <button type="button" id="preview-choose" data-testid="preview-choose" class="btn btn-quiet rounded-lg px-4 text-[13px] hidden">Elegir canciones</button>
+                <button type="button" id="preview-cancel" class="btn btn-quiet rounded-lg px-4 text-[13px]">Cancelar</button>
+              </div>
+            </div>
+          </form>
+
+          <!-- My Tracks con un clic -->
+          <button id="mytracks-btn" data-testid="mytracks-btn"
+            class="btn btn-run btn-primary mt-3 w-full rounded-xl px-5 py-4 flex items-center justify-between gap-4 text-left">
             <span>
               <span class="block text-[15px] font-semibold">Descargar My Tracks</span>
-              <span class="block text-[13px] text-[#4B545C] mt-0.5">Todas tus pistas favoritas que aún no estén en disco</span>
+              <span id="mytracks-info" data-testid="mytracks-info" class="block text-[13px] text-[#4B545C] mt-0.5">Ver tus favoritos y elegir cuáles bajar</span>
             </span>
             <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/>
@@ -183,32 +122,16 @@
           </button>
 
           <div class="mt-3 rounded-xl bg-panel border border-line divide-y divide-[#1F2428]">
-
-            <!-- Playlist -->
+            <!-- Playlists de la cuenta: elegir una llena la vista previa -->
             <div class="p-4">
               <div class="flex items-center justify-between mb-2">
-                <label for="playlist-select" class="text-[13px] font-medium">Playlist de tu cuenta</label>
-                <button onclick="loadPlaylists()" class="btn text-xs text-mute hover:text-[#D5DBDF] px-1.5 py-0.5 rounded">Recargar</button>
+                <label for="playlist-select" class="text-[13px] font-medium">O abre una de tus playlists</label>
+                <button type="button" data-action="load-playlists" class="btn text-xs text-mute hover:text-[#D5DBDF] px-1.5 py-0.5 rounded">Recargar</button>
               </div>
-              <div class="flex gap-2">
-                <select id="playlist-select" class="field flex-1 min-w-0 rounded-lg px-3 py-2.5 text-[13px]">
-                  <option value="">Cargando playlists…</option>
-                </select>
-                <button onclick="runDownloadPlaylist(this)" class="btn btn-run btn-quiet rounded-lg px-4 text-[13px] font-medium shrink-0">Descargar</button>
-              </div>
-              <p class="mt-2 text-xs text-mute leading-relaxed">Crea <code class="font-mono text-[11.5px] text-soft">playlists/&lt;nombre&gt;.m3u8</code> con el orden de Tidal.</p>
-            </div>
-
-            <!-- URL -->
-            <div class="p-4">
-              <label for="tidal-url" class="block text-[13px] font-medium mb-2">Por URL o ID</label>
-              <div class="flex gap-2">
-                <input id="tidal-url" type="text" spellcheck="false" autocomplete="off"
-                  placeholder="tidal.com/album/123 · playlist/… · track/456"
-                  class="field flex-1 min-w-0 rounded-lg px-3 py-2.5 text-[13px] font-mono">
-                <button onclick="runDownload(this)" class="btn btn-run btn-quiet rounded-lg px-4 text-[13px] font-medium shrink-0">Descargar</button>
-              </div>
-              <p class="mt-2 text-xs text-mute">Track, álbum, playlist, artista o mix.</p>
+              <select id="playlist-select" data-testid="playlist-select" class="field w-full rounded-lg px-3 py-2.5 text-[13px]">
+                <option value="">Cargando playlists…</option>
+              </select>
+              <p class="mt-2 text-xs text-mute leading-relaxed">Las playlists y los mixes crean <code class="font-mono text-[11.5px] text-soft">playlists/&lt;nombre&gt;.m3u8</code> con el orden de Tidal.</p>
             </div>
 
             <!-- Carpeta -->
@@ -217,7 +140,7 @@
               <div class="flex gap-2">
                 <input id="download-dir" type="text" spellcheck="false" placeholder="~/Music/Tidal"
                   class="field flex-1 min-w-0 rounded-lg px-3 py-2.5 text-[13px] font-mono">
-                <button onclick="pickDownloadFolder()" aria-label="Elegir carpeta de la biblioteca" title="Elegir carpeta"
+                <button type="button" data-action="pick-download-folder" aria-label="Elegir carpeta de la biblioteca" title="Elegir carpeta"
                   class="btn btn-quiet rounded-lg px-3 shrink-0">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M3.5 7.5A1.5 1.5 0 015 6h4l2 2h8a1.5 1.5 0 011.5 1.5v8A1.5 1.5 0 0119 19H5a1.5 1.5 0 01-1.5-1.5v-10z"/>
@@ -236,18 +159,18 @@
                 <span id="hires-status" class="text-xs text-mute truncate">comprobando…</span>
               </div>
               <p class="mt-1.5 text-xs text-mute leading-relaxed flex-1">Baja otra vez en 24-bit los FLAC que Tidal tenga en Hi-Res. También corre tras cada descarga.</p>
-              <button onclick="runHires(this)" class="btn btn-run btn-accent mt-3 rounded-lg py-2 text-[13px] font-medium">Mejorar a Hi-Res</button>
+              <button data-action="run-hires" class="btn btn-run btn-accent mt-3 rounded-lg py-2 text-[13px] font-medium">Mejorar a Hi-Res</button>
             </div>
 
             <div class="rounded-xl bg-panel border border-line p-4 flex flex-col">
               <div class="flex items-center justify-between gap-2">
                 <span class="text-[13px] font-medium">Teléfono</span>
-                <button id="phone-status" onclick="checkPhone()" title="Volver a comprobar"
+                <button id="phone-status" data-action="check-phone" title="Volver a comprobar"
                   class="btn text-xs text-mute truncate hover:text-[#D5DBDF] rounded px-1">comprobando…</button>
               </div>
               <p class="mt-1.5 text-xs text-mute leading-relaxed flex-1">Copia por adb a <code class="font-mono text-[11px] text-soft">Download/Quick Share</code> lo nuevo y las playlists. No borra nada ni recupera lo que borraste.</p>
               <div class="mt-3 flex items-center gap-3">
-                <button onclick="runPhoneSync(this)" class="btn btn-run btn-accent flex-1 rounded-lg py-2 text-[13px] font-medium">Enviar al teléfono</button>
+                <button data-action="run-phone" class="btn btn-run btn-accent flex-1 rounded-lg py-2 text-[13px] font-medium">Enviar al teléfono</button>
                 <label class="flex items-center gap-1.5 text-xs text-mute cursor-pointer select-none">
                   <input id="phone-simulate" type="checkbox" class="accent-[#7CC6D6] w-3.5 h-3.5"> simular
                 </label>
@@ -268,7 +191,7 @@
               <h3 class="text-[14px] font-medium">Cambiar por versiones de mayor calidad</h3>
               <p class="mt-1 text-[13px] text-mute leading-relaxed max-w-[52ch]">Busca cada favorito en Hi-Res o Lossless y sustituye el que tengas en menor calidad.</p>
             </div>
-            <button onclick="runTool('quality', this)" class="btn btn-run btn-quiet rounded-lg px-4 py-2 text-[13px] font-medium shrink-0">Ejecutar</button>
+            <button data-action="run-tool" data-tool="quality" class="btn btn-run btn-quiet rounded-lg px-4 py-2 text-[13px] font-medium shrink-0">Ejecutar</button>
           </div>
 
           <div class="row py-4 flex items-start gap-4">
@@ -276,7 +199,7 @@
               <h3 class="text-[14px] font-medium">Quitar duplicados</h3>
               <p class="mt-1 text-[13px] text-mute leading-relaxed max-w-[52ch]">Encuentra canciones repetidas en My Tracks, conserva la de mejor calidad y elimina el resto.</p>
             </div>
-            <button onclick="runTool('dupes', this)" class="btn btn-run btn-quiet rounded-lg px-4 py-2 text-[13px] font-medium shrink-0">Ejecutar</button>
+            <button data-action="run-tool" data-tool="dupes" class="btn btn-run btn-quiet rounded-lg px-4 py-2 text-[13px] font-medium shrink-0">Ejecutar</button>
           </div>
         </section>
 
@@ -293,15 +216,15 @@
           <div class="flex gap-2">
             <input id="music-dir" type="text" spellcheck="false" placeholder="/home/usuario/Música"
               class="field flex-1 min-w-0 rounded-lg px-3 py-2.5 text-[13px] font-mono">
-            <button id="pick-btn" onclick="pickFolder()" aria-label="Elegir carpeta con tu música" title="Elegir carpeta"
+            <button type="button" id="pick-btn" data-action="pick-music-folder" aria-label="Elegir carpeta con tu música" title="Elegir carpeta"
               class="btn btn-quiet rounded-lg px-3 shrink-0">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.5 7.5A1.5 1.5 0 015 6h4l2 2h8a1.5 1.5 0 011.5 1.5v8A1.5 1.5 0 0119 19H5a1.5 1.5 0 01-1.5-1.5v-10z"/>
               </svg>
             </button>
-            <button id="save-btn" onclick="saveConfig()" class="btn btn-quiet rounded-lg px-3 text-[13px] shrink-0">Guardar</button>
+            <button type="button" id="save-btn" data-action="save-config" class="btn btn-quiet rounded-lg px-3 text-[13px] shrink-0">Guardar</button>
           </div>
-          <button onclick="runTool('sync', this)" class="btn btn-run btn-quiet mt-3 w-full rounded-lg py-2.5 text-[13px] font-medium">Sincronizar con Tidal</button>
+          <button data-action="run-tool" data-tool="sync" class="btn btn-run btn-quiet mt-3 w-full rounded-lg py-2.5 text-[13px] font-medium">Sincronizar con Tidal</button>
         </section>
 
         <details class="reveal group text-xs text-mute">
@@ -310,8 +233,8 @@
             Requisitos
           </summary>
           <ul class="mt-3 space-y-1.5 leading-relaxed pl-4 list-disc marker:text-[#3A424A]">
-            <li><code class="font-mono text-soft">tiddl</code> con sesión: <code class="font-mono text-soft">tiddl auth login</code>, y FFmpeg instalado.</li>
-            <li>Playlists y Hi-Res usan la sesión PKCE: <code class="font-mono text-soft">.venv/bin/python -m core.hires login</code> (una vez).</li>
+            <li>Sesión de Tidal (una vez): <code class="font-mono text-soft">.venv/bin/python -m core.hires login</code>. La usan la vista previa, Hi-Res y las herramientas de My Tracks.</li>
+            <li><code class="font-mono text-soft">tiddl</code> con sesión para descargar (<code class="font-mono text-soft">tiddl auth login</code>) y FFmpeg instalado.</li>
             <li>Teléfono: depuración USB activa y <code class="font-mono text-soft">adb</code> instalado.</li>
             <li>Carátula, letras y Atmos se configuran en <code class="font-mono text-soft">~/.tiddl/config.toml</code>.</li>
           </ul>
@@ -330,21 +253,21 @@
               Elige una acción a la izquierda. El registro muestra lo que se descarga, lo que se salta y cualquier error, y al final un resumen.
             </p>
             <ol class="mt-8 space-y-3 text-[13px]">
-              <li class="flex gap-3"><span class="font-mono text-mute w-5">01</span><span class="text-soft">Descarga My Tracks o una playlist</span></li>
+              <li class="flex gap-3"><span class="font-mono text-mute w-5">01</span><span class="text-soft">Pega un link o descarga My Tracks</span></li>
               <li class="flex gap-3"><span class="font-mono text-mute w-5">02</span><span class="text-soft">Las que Tidal tenga en Hi-Res se mejoran solas</span></li>
               <li class="flex gap-3"><span class="font-mono text-mute w-5">03</span><span class="text-soft">Envía lo nuevo al teléfono</span></li>
             </ol>
           </div>
 
           <!-- Con operación -->
-          <div id="op-active" class="hidden">
+          <div id="op-active" class="hidden" data-testid="op-active">
             <div class="px-5 pt-5 pb-4 border-b border-line">
               <div class="flex items-center justify-between gap-3 mb-3">
                 <div class="flex items-center gap-2.5 min-w-0">
                   <div id="op-icon" class="w-7 h-7 rounded-lg flex items-center justify-center"></div>
                   <span id="op-title" class="text-[14px] font-semibold truncate"></span>
                 </div>
-                <button id="stop-btn" onclick="stopOperation()"
+                <button id="stop-btn" data-action="stop"
                   class="btn hidden text-xs text-mute hover:text-[#E7A6A6] px-2.5 py-1 rounded-md hover:bg-[#E7A6A6]/10">Detener</button>
               </div>
               <div class="h-1 bg-raised rounded-full overflow-hidden">
@@ -361,7 +284,7 @@
           </div>
 
           <div id="summary" class="hidden px-5 py-4 border-t border-line">
-            <div id="summary-content" class="flex flex-wrap gap-2"></div>
+            <div id="summary-content" data-testid="summary" class="flex flex-wrap gap-2"></div>
           </div>
         </section>
       </aside>
@@ -373,6 +296,46 @@
     <span class="font-mono">localhost:5000</span>
   </footer>
 
-  <script src="/static/js/app.js"></script>
+  <!-- ── Ventana de selección de canciones (My Tracks, playlists…) ── -->
+  <dialog id="songs-dialog" data-testid="songs-dialog" aria-labelledby="songs-title"
+    class="p-0 w-[min(760px,calc(100vw-24px))] h-[min(86dvh,920px)] max-h-none rounded-2xl bg-panel border border-line text-[#E7EBEE] backdrop:bg-black/70 backdrop:backdrop-blur-sm">
+    <div class="flex flex-col h-full">
+      <header class="px-5 pt-5 pb-4 border-b border-line">
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <p id="songs-type" class="text-xs text-accent font-medium"></p>
+            <h2 id="songs-title" class="mt-1 text-lg font-semibold tracking-[-0.015em] break-words"></h2>
+            <p id="songs-detail" class="text-[13px] text-mute"></p>
+          </div>
+          <button type="button" id="songs-close" aria-label="Cerrar" title="Cerrar (Esc)"
+            class="btn btn-quiet rounded-lg w-9 h-9 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+
+        <div class="mt-4 grid sm:grid-cols-2 gap-2">
+          <button type="button" id="songs-all" data-testid="songs-all"
+            class="btn btn-run btn-primary rounded-lg py-2.5 text-[13px] font-semibold">Descargar todo</button>
+          <button type="button" id="songs-selected" data-testid="songs-selected" disabled
+            class="btn btn-run btn-accent rounded-lg py-2.5 text-[13px] font-semibold">Descargar seleccionadas (0)</button>
+        </div>
+
+        <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <input type="search" id="songs-search" data-testid="songs-search" spellcheck="false" autocomplete="off"
+            placeholder="Buscar canción o artista" aria-label="Buscar canción o artista"
+            class="field flex-1 min-w-[180px] rounded-lg px-3 py-2 text-[13px]">
+          <label class="flex items-center gap-2 text-xs text-soft cursor-pointer select-none">
+            <input type="checkbox" id="songs-toggle" data-testid="songs-toggle" class="accent-[#7CC6D6] w-3.5 h-3.5">
+            Marcar las que faltan
+          </label>
+        </div>
+        <p id="songs-counts" data-testid="songs-counts" class="mt-2 text-xs text-mute tabular-nums" aria-live="polite"></p>
+      </header>
+
+      <ul id="songs-list" data-testid="songs-list" class="flex-1 overflow-y-auto overscroll-contain py-1" aria-label="Canciones"></ul>
+    </div>
+  </dialog>
+
+  <script type="module" src="/static/js/main.js"></script>
 </body>
 </html>

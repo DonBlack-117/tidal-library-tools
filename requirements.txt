@@ -1,3 +1,5 @@
 flask>=3.0
 tidalapi>=0.7
 tiddl>=3.2
+mutagen>=1.47
+requests>=2.31

@@ -15,9 +15,13 @@ USO:
   python mejorar_calidad_tidal.py
 """
 
+import sys
+
 import re
 import time
 from collections import defaultdict
+
+from core import sesion
 
 try:
     import tidalapi
@@ -381,21 +385,17 @@ def main():
     if tidalapi is None:
         print("❌ tidalapi no está instalado.")
         print("   Ejecuta en tu terminal:  pip install tidalapi")
-        return
+        return 1
 
     print("=" * 62)
     print("    Mejorador de Calidad de Audio — Tidal My Tracks")
     print("=" * 62)
 
     # ── 1. Autenticación ──────────────────────────────────────────
-    print("\n[1/4] Conectando con Tidal (se abrirá tu navegador)...")
-    session = tidalapi.Session()
-    try:
-        session.login_oauth_simple()
-    except Exception as e:
-        print(f"❌ No se pudo conectar: {e}")
-        return
-    print("✅ Sesión iniciada correctamente")
+    print("\n[1/4] Conectando con Tidal (sesión guardada)...")
+    session = sesion.para_scripts()
+    if session is None:
+        return 1
 
     # ── 2. Descargar My Tracks ────────────────────────────────────
     print("\n[2/4] Descargando tu lista completa de My Tracks...")
@@ -403,7 +403,7 @@ def main():
         tracks = get_all_tracks(session)
     except Exception as e:
         print(f"❌ Error: {e}")
-        return
+        return 1
     print(f"  📋 {len(tracks)} canciones descargadas")
 
     # ── 3. Vista previa de distribución de calidad ────────────────
@@ -433,7 +433,7 @@ def main():
     )
     if confirm not in ("si", "sí", "yes", "s", "y"):
         print("❌ Cancelado.")
-        return
+        return 1
 
     # ── 4. Procesar tracks ────────────────────────────────────────
     print("\n[4/4] Procesando canciones...\n")
@@ -475,4 +475,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)

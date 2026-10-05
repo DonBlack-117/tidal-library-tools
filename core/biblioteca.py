@@ -5,14 +5,13 @@ sin subcarpetas ni número de pista en el nombre.
 tiddl descarga primero en <base>/.descarga con su plantilla de carpetas; al
 terminar, `aplanar` mueve cada archivo a su sitio. Como tiddl ya no puede ver
 lo descargado (los nombres cambian), las pistas ya presentes se reconocen por
-ISRC: `pendientes_my_tracks` pide a Tidal el ISRC de cada favorito (guardado en
-<base>/.tidal_ids.json para no repetirlo) y solo devuelve los que faltan.
+ISRC (core/recursos.py compara el ISRC de cada pista de Tidal con los de aquí).
+<base>/.tidal_ids.json guarda ID de Tidal → ISRC para core/hires.py.
 """
 
 import json
 import re
 import shutil
-import time
 import unicodedata
 from pathlib import Path
 
@@ -23,11 +22,24 @@ REGISTRO = ".tidal_ids.json"
 AUDIO_EXT = (".flac", ".m4a")
 ATMOS_SUFFIX = " [Dolby Atmos]"
 
-ESPERA_429 = 60
-MAX_REINTENTOS_429 = 3
+
+
+_CACHE_TAGS: dict[tuple[str, int, int], dict] = {}
 
 
 def _tags(path: Path) -> dict:
+    """ISRC, artista y álbum de un archivo de audio, con caché por ruta, tamaño y fecha."""
+    try:
+        st = path.stat()
+    except OSError:
+        return {}
+    clave = (str(path), st.st_size, st.st_mtime_ns)
+    if clave not in _CACHE_TAGS:
+        _CACHE_TAGS[clave] = _leer_tags(path)
+    return _CACHE_TAGS[clave]
+
+
+def _leer_tags(path: Path) -> dict:
     """ISRC, artista y álbum de un archivo de audio (FLAC o M4A)."""
     import mutagen
 
@@ -44,11 +56,13 @@ def _tags(path: Path) -> dict:
             "isrc": bytes(isrc[0]).decode(errors="ignore") if isrc else "",
             "artist": str((t.get("\xa9ART") or [""])[0]),
             "album": str((t.get("\xa9alb") or [""])[0]),
+            "title": str((t.get("\xa9nam") or [""])[0]),
         }
     return {
         "isrc": (t.get("isrc") or [""])[0],
         "artist": (t.get("artist") or [""])[0],
         "album": (t.get("album") or [""])[0],
+        "title": (t.get("title") or [""])[0],
     }
 
 
@@ -64,6 +78,26 @@ def isrcs_locales(base: Path) -> set[tuple[str, str]]:
             if isrc:
                 pares.add((isrc.upper(), p.suffix))
     return pares
+
+
+def isrcs_presentes(base: Path) -> set[str]:
+    """ISRC de todo lo que ya está en <base>/canciones, sin importar el formato."""
+    return {isrc for isrc, _ in isrcs_locales(base)}
+
+
+def clave_titulo(artista: str, titulo: str) -> str:
+    """Artista y título normalizados (sin acentos ni mayúsculas) para comparar."""
+    texto = unicodedata.normalize("NFKD", f"{artista} - {titulo}").encode("ascii", "ignore").decode()
+    return re.sub(r"\s+", " ", texto).strip().casefold()
+
+
+def titulos_presentes(base: Path) -> set[str]:
+    """Artista y título de lo que hay en <base>/canciones, para pistas sin ISRC."""
+    carpeta = base / CANCIONES
+    if not carpeta.is_dir():
+        return set()
+    return {clave_titulo(t.get("artist", ""), t.get("title", ""))
+            for p in carpeta.iterdir() if p.suffix in AUDIO_EXT and (t := _tags(p))}
 
 
 def _flac_hires(path: Path) -> bool:
@@ -190,49 +224,10 @@ def _guardar_registro(base: Path, registro: dict) -> None:
     tmp.replace(base / REGISTRO)
 
 
-def pendientes_my_tracks(base: Path):
-    """
-    Devuelve (con `yield from`) los IDs de My Tracks cuyo ISRC no está en
-    <base>/canciones. Los favoritos que Tidal ya no tiene (404) se registran
-    como None y no se vuelven a intentar.
-    """
-    from rich.console import Console
-    from tiddl.cli.ctx import ContextObject
-    from tiddl.core.api.exceptions import ApiError
-
-    api = ContextObject(False, None, Console(quiet=True)).api
-    favoritos = [str(i) for i in api.get_favorites().model_dump()["TRACK"]]
+def registrar_ids(base: Path, ids_isrc: dict[str, str]) -> None:
+    """Guarda ID de Tidal → ISRC; core/hires.py lo usa para saber qué pista bajar en Hi-Res."""
     registro = _cargar_registro(base)
-    nuevos = [i for i in favoritos if i not in registro]
-
-    if nuevos:
-        yield f"🔎 Consultando {len(nuevos)} favorito(s) nuevos en Tidal (ISRC)…"
-    for n, tid in enumerate(nuevos, 1):
-        for intento in range(MAX_REINTENTOS_429 + 1):
-            try:
-                registro[tid] = (api.get_track(tid).isrc or "").upper() or None
-                break
-            except ApiError as e:
-                if e.status == 429 and intento < MAX_REINTENTOS_429:
-                    yield f"⏳ Límite de Tidal (429); espero {ESPERA_429}s"
-                    time.sleep(ESPERA_429)
-                    continue
-                if e.status == 404:
-                    registro[tid] = None
-                break
-            except Exception:
-                break
-        if n % 100 == 0:
-            _guardar_registro(base, registro)
-        if n % 10 == 0 or n == len(nuevos):
-            yield f"   {n}/{len(nuevos)}"   # la web lo usa como barra de progreso
+    for tid, isrc in ids_isrc.items():
+        if isrc:
+            registro[str(tid)] = isrc.upper()
     _guardar_registro(base, registro)
-
-    locales = {isrc for isrc, _ in isrcs_locales(base)}
-    pendientes = [i for i in favoritos
-                  if i not in registro or (registro[i] and registro[i] not in locales)]
-    no_disponibles = sum(1 for i in favoritos if i in registro and registro[i] is None)
-
-    yield (f"📋 My Tracks: {len(favoritos)} favoritos, {len(favoritos) - len(pendientes) - no_disponibles} "
-           f"ya descargados, {no_disponibles} no disponibles en Tidal, {len(pendientes)} por descargar")
-    return pendientes
