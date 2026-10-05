@@ -414,37 +414,13 @@ def _descargar(destino_args: list[str], output_dir: str):
     return code or code2 or code3
 
 
-def descargar_recurso(url: str, output_dir: str = ""):
+def descargar_pistas(ids: list[int | str], base: Path):
     """
-    Descarga una URL/shorthand de Tidal en calidad máxima.
-    Hace yield de cada línea para SSE y devuelve el código de salida de tiddl.
+    Descarga estas pistas (IDs de Tidal) en calidad máxima a la biblioteca plana.
+    Quien llama ya quitó las que estaban en disco. Hace yield de cada línea para
+    SSE y devuelve el código de salida.
     """
-    # Las playlists van por core.playlists: salta lo ya descargado (ISRC) y crea el .m3u8
-    if re.search(r"playlist/[0-9a-f]{8}-", url, re.I):
-        from core.playlists import descargar_playlist
-        return (yield from descargar_playlist(url, output_dir))
-    yield f"▶ Recurso: {url}  (calidad: MAX)"
-    return (yield from _descargar(["url", url], output_dir))
-
-
-def descargar_mis_tracks(output_dir: str = ""):
-    """
-    Descarga todas las pistas favoritas (My Tracks) en calidad máxima.
-    Hace yield de cada línea para SSE y devuelve el código de salida de tiddl.
-    """
-    yield "▶ My Tracks (favoritos de tipo track)  (calidad: MAX)"
-    base = Path(output_dir or DEFAULT_OUTPUT_DIR).expanduser()
-    try:
-        pendientes = yield from biblioteca.pendientes_my_tracks(base)
-    except Exception as e:
-        yield f"❌ No se pudo leer My Tracks: {e}"
-        return 1
-    if not pendientes:
-        yield "✅ Todo al día: no hay canciones nuevas"
-        yield from biblioteca.aplanar(base)
-        yield ""
-        return (yield from hires.mejorar(base))
-    return (yield from _descargar(["url", *(f"track/{i}" for i in pendientes)], output_dir))
+    return (yield from _descargar(["url", *(f"track/{i}" for i in ids)], str(base)))
 
 
 def verificar_tiddl() -> tuple[bool, str]:
@@ -471,9 +447,6 @@ def verificar_tiddl() -> tuple[bool, str]:
 
 if __name__ == "__main__":
     # Uso: python -m core.descargar [carpeta]   → descarga My Tracks
-    gen = descargar_mis_tracks(sys.argv[1] if len(sys.argv) > 1 else "")
-    try:
-        while True:
-            print(next(gen), flush=True)
-    except StopIteration as stop:
-        sys.exit(stop.value if isinstance(stop.value, int) else 0)
+    from core.recursos import _main
+
+    sys.exit(_main(["mytracks", *sys.argv[1:2]]))

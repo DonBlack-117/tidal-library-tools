@@ -14,6 +14,8 @@ USO:
   python limpiar_duplicados_tidal.py
 """
 
+import sys
+
 import re
 import time
 from collections import defaultdict
@@ -30,6 +32,8 @@ MAX_TRACKS = 50_000
 
 # Archivo de log con lo que se eliminó
 LOG_ELIMINADOS = "tidal_duplicados_eliminados.txt"
+
+from core import sesion
 
 try:
     import tidalapi
@@ -417,21 +421,17 @@ def main():
     if tidalapi is None:
         print("❌ tidalapi no está instalado.")
         print("   Ejecuta en tu terminal:  pip install tidalapi")
-        return
+        return 1
 
     print("=" * 62)
     print("    Limpiador de Duplicados en Tidal My Tracks")
     print("=" * 62)
 
     # ── 1. Autenticación (solo una vez) ───────────────────────────
-    print("\n[1/3] Conectando con Tidal (se abrirá tu navegador)...")
-    session = tidalapi.Session()
-    try:
-        session.login_oauth_simple()
-    except Exception as e:
-        print(f"❌ No se pudo conectar: {e}")
-        return
-    print("✅ Sesión iniciada correctamente")
+    print("\n[1/3] Conectando con Tidal (sesión guardada)...")
+    session = sesion.para_scripts()
+    if session is None:
+        return 1
 
     # ── 2. Vista previa rápida y confirmación ─────────────────────
     print("\n[2/3] Escaneando para mostrar una vista previa...")
@@ -439,7 +439,7 @@ def main():
         tracks = get_all_tracks(session)
     except Exception as e:
         print(f"❌ Error: {e}")
-        return
+        return 1
 
     duplicates = find_duplicates(tracks)
 
@@ -479,7 +479,7 @@ def main():
     )
     if confirm not in ("si", "sí", "yes", "s", "y"):
         print("❌ Cancelado. No se eliminó nada.")
-        return
+        return 1
 
     # ── 3. Bucle hasta que no queden duplicados ───────────────────
     print("\n[3/3] Iniciando limpieza automática por rondas...\n")
@@ -528,4 +528,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)
