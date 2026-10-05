@@ -1,0 +1,90 @@
+/* Fuente de Tailwind. Se compila a static/css/app.css con scripts/construir-css.sh */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "Geist";
+  src: url("../vendor/fonts/geist.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Mono";
+  src: url("../vendor/fonts/geist-mono.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root { color-scheme: dark; }
+html { scroll-behavior: smooth; }
+body { font-feature-settings: "ss01", "cv11"; -webkit-font-smoothing: antialiased; }
+h1, h2, h3, p { text-wrap: pretty; }
+h1, h2 { text-wrap: balance; }
+
+/* Grano: rompe la planitud del fondo sin pesar */
+.grain {
+  position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: .05;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+/* Luz ambiental única, fija, sin animar */
+.ambient {
+  position: fixed; inset: -20% -10% auto auto; width: 60vw; height: 60vw; z-index: 0; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(124,198,214,.07), transparent 70%);
+}
+
+/* Controles */
+.field {
+  background: #1A1E22; border: 1px solid #252A2F; color: #E7EBEE;
+  transition: border-color .18s ease, background-color .18s ease;
+}
+.field::placeholder { color: #59616A; }
+.field:hover { border-color: #313840; }
+.field:focus { outline: none; border-color: rgba(124,198,214,.55); background: #1C2126; }
+select.field { appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%237D868F' stroke-width='1.6'><path d='M3 4.5l3 3 3-3'/></svg>"); background-repeat: no-repeat; background-position: right .75rem center; padding-right: 2rem; }
+
+.btn {
+  transition: background-color .18s ease, border-color .18s ease, color .18s ease, transform .12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:not(:disabled):active { transform: scale(.98); }
+.btn:disabled { opacity: .38; cursor: not-allowed; }
+.btn-primary { background: #E7EBEE; color: #0E1012; }
+.btn-primary:not(:disabled):hover { background: #FFFFFF; }
+.btn-quiet { background: #1A1E22; border: 1px solid #252A2F; color: #D5DBDF; }
+.btn-quiet:not(:disabled):hover { border-color: #3A424A; background: #1E2327; }
+.btn-accent { background: rgba(124,198,214,.12); border: 1px solid rgba(124,198,214,.28); color: #A9DCE7; }
+.btn-accent:not(:disabled):hover { background: rgba(124,198,214,.18); border-color: rgba(124,198,214,.5); }
+
+:focus-visible { outline: 2px solid rgba(124,198,214,.8); outline-offset: 2px; border-radius: 8px; }
+
+/* Filas de herramientas: separadas por línea, sin tarjeta */
+.row + .row { border-top: 1px solid #1F2428; }
+
+/* Log */
+#log-output { font-variant-numeric: tabular-nums; scrollbar-width: thin; scrollbar-color: #2C3237 transparent; }
+.log-line { animation: line-in .14s ease-out; }
+@keyframes line-in { from { opacity: 0; transform: translateY(2px); } }
+
+/* Barra de progreso (JS usa .progress-indeterminate) */
+.progress-indeterminate {
+  background: linear-gradient(90deg, transparent, #7CC6D6 45%, transparent);
+  background-size: 40% 100%; background-repeat: no-repeat;
+  animation: sweep 1.4s cubic-bezier(.45,.05,.55,.95) infinite;
+}
+@keyframes sweep { from { background-position: -40% 0; } to { background-position: 140% 0; } }
+
+/* Entrada escalonada, una sola vez */
+.reveal { opacity: 0; animation: reveal .5s cubic-bezier(.2,.7,.2,1) forwards; }
+.reveal:nth-child(2) { animation-delay: .06s; }
+.reveal:nth-child(3) { animation-delay: .12s; }
+.reveal:nth-child(4) { animation-delay: .18s; }
+@keyframes reveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+#summary-content > div { animation: reveal .3s cubic-bezier(.2,.7,.2,1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .reveal { opacity: 1; }
+  html { scroll-behavior: auto; }
+}

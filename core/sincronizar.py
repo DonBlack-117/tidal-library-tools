@@ -13,15 +13,18 @@ INSTALACIÓN (ejecuta esto en tu terminal primero):
 USO:
   python sincronizar_tidal.py
 
-  Se abrirá tu navegador para que inicies sesión en Tidal.
+  Usa la sesión de Tidal guardada (python -m core.hires login, una vez).
   Luego el script trabaja solo.
 """
 
 import os
+import sys
 import re
 import time
 import json
 from pathlib import Path
+
+from core import sesion
 
 try:
     import tidalapi
@@ -164,21 +167,17 @@ def main():
     if tidalapi is None:
         print("❌ tidalapi no está instalado.")
         print("   Ejecuta en tu terminal:  pip install tidalapi")
-        return
+        return 1
 
     print("=" * 62)
     print("    Sincronizador de Música Local → Tidal My Tracks")
     print("=" * 62)
 
     # ── 1. Autenticación ─────────────────────────────────────────
-    print("\n[1/4] Conectando con Tidal (se abrirá tu navegador)...")
-    session = tidalapi.Session()
-    try:
-        session.login_oauth_simple()
-    except Exception as e:
-        print(f"❌ No se pudo conectar: {e}")
-        return
-    print(f"✅ Sesión iniciada correctamente")
+    print("\n[1/4] Conectando con Tidal (sesión guardada)...")
+    session = sesion.para_scripts()
+    if session is None:
+        return 1
 
     # ── 2. Favoritos actuales (paginación completa) ───────────────
     print("\n[2/4] Leyendo tu My Tracks actual en Tidal...")
@@ -239,7 +238,7 @@ def main():
     songs = get_songs_from_folder(MUSIC_DIR)
     if not songs:
         print("❌ No se encontraron canciones. Verifica la ruta.")
-        return
+        return 1
     print(f"✅ {len(songs)} canciones encontradas localmente")
 
     # ── 4. Buscar y agregar ───────────────────────────────────────
@@ -313,4 +312,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)

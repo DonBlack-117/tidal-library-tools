@@ -25,31 +25,15 @@ from pathlib import Path
 
 import requests
 
+from core.sesion import SESSION_FILE, sesion  # noqa: F401  (sesion se usa desde app.py y playlists)
+
 BASE_DIR = Path(__file__).resolve().parent.parent
-SESSION_FILE = BASE_DIR / "tidal-pkce.session.json"  # ignorado por *.session.json
 ESTADO = ".hires.json"  # ISRC → "hires" | "no-hires" | "cifrado"
 CANCIONES = "canciones"
 
 PAUSA = 1.0  # segundos entre pistas, para no provocar 429
 ESPERA_429 = 60
 MAX_REINTENTOS = 3
-
-
-def sesion():
-    """Sesión PKCE guardada, o None si no existe o caducó."""
-    import tidalapi
-
-    if not SESSION_FILE.exists():
-        return None
-    s = tidalapi.Session()
-    try:
-        if s.load_session_from_file(SESSION_FILE) and s.check_login():
-            s.audio_quality = tidalapi.Quality.hi_res_lossless
-            s.save_session_to_file(SESSION_FILE)  # guarda el token renovado
-            return s
-    except Exception:
-        pass
-    return None
 
 
 def login() -> int:
