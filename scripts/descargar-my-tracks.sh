@@ -23,7 +23,7 @@ fi
 
 if ! "$PROJECT_DIR/.venv/bin/tiddl" auth refresh >>"$LOG_FILE" 2>&1; then
     echo "❌ La sesión de tiddl no es válida. Ejecuta: $PROJECT_DIR/.venv/bin/tiddl auth login" | tee -a "$LOG_FILE"
-    command -v notify-send >/dev/null && notify-send -i "$PROJECT_DIR/img/icontidal.png" "Tidal My Tracks" "Sesión caducada: ejecuta tiddl auth login"
+    command -v notify-send >/dev/null && notify-send -i "$PROJECT_DIR/static/img/icontidal.png" "Tidal My Tracks" "Sesión caducada: ejecuta tiddl auth login"
     pausar; exit 1
 fi
 
@@ -40,9 +40,9 @@ CODE=${PIPESTATUS[0]}
 echo "Log: $LOG_FILE"
 if command -v notify-send >/dev/null; then
     if [[ $CODE -eq 0 ]]; then
-        notify-send -i "$PROJECT_DIR/img/icontidal.png" "Tidal My Tracks" "Descarga completada"
+        notify-send -i "$PROJECT_DIR/static/img/icontidal.png" "Tidal My Tracks" "Descarga completada"
     else
-        notify-send -i "$PROJECT_DIR/img/icontidal.png" "Tidal My Tracks" "Terminó con errores (código $CODE)"
+        notify-send -i "$PROJECT_DIR/static/img/icontidal.png" "Tidal My Tracks" "Terminó con errores (código $CODE)"
     fi
 fi
 pausar

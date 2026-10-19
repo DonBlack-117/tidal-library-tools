@@ -162,14 +162,14 @@ scripts/descargar-my-tracks.sh            # → ~/Music/Tidal
 scripts/descargar-my-tracks.sh /other/dir
 ```
 
-It uses the project `.venv`, checks the tiddl session, and writes a log to `logs/tidal_my_tracks_<date>.log`. On Linux, the launcher `~/.local/share/applications/tidal-my-tracks.desktop` (icon `img/icontidal.png`) runs it from the app menu in a terminal:
+It uses the project `.venv`, checks the tiddl session, and writes a log to `logs/tidal_my_tracks_<date>.log`. On Linux, the launcher `~/.local/share/applications/tidal-my-tracks.desktop` (icon `static/img/icontidal.png`) runs it from the app menu in a terminal:
 
 ```ini
 [Desktop Entry]
 Type=Application
 Name=Tidal My Tracks
 Exec="/path/to/tidal/scripts/descargar-my-tracks.sh" --pausa
-Icon=/path/to/tidal/img/icontidal.png
+Icon=/path/to/tidal/static/img/icontidal.png
 Terminal=true
 Categories=AudioVideo;Audio;Music;
 ```
@@ -239,3 +239,11 @@ tidal/
 - The session file (`tidal-pkce.session.json`) stores your tidalapi authentication locally and is excluded from the repository.
 - tiddl credentials are stored in `~/.tiddl/` and excluded from the repository.
 - Result `.txt` log files are saved to `logs/` and excluded from the repository.
+
+## Disclaimer
+
+This project is not affiliated with or endorsed by Tidal. It uses unofficial APIs, and downloading may go against Tidal's Terms of Service. Use it only for personal use with your own paid subscription, and do not share downloaded files.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
