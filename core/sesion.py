@@ -9,6 +9,7 @@ tidal-pkce.session.json. Se crea una vez con:
 tiddl tiene su propia sesión y solo se usa para descargar.
 """
 
+import os
 import sys
 import threading
 from pathlib import Path
@@ -54,9 +55,17 @@ def sesion():
 
 
 def _guardar(s) -> None:
-    """Escribe en un temporal y lo reemplaza: el archivo nunca queda a medias."""
+    """
+    Escribe en un temporal y lo reemplaza: el archivo nunca queda a medias.
+    Permisos 0600: el archivo lleva access y refresh token, y no debe quedar
+    legible para otros usuarios del equipo.
+    """
     tmp = SESSION_FILE.with_name(SESSION_FILE.name + ".tmp")
     s.save_session_to_file(tmp)
+    try:
+        os.chmod(tmp, 0o600)
+    except OSError:
+        pass
     tmp.replace(SESSION_FILE)
 
 

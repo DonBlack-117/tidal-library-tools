@@ -34,7 +34,9 @@ if [[ ! -f "$PROJECT_DIR/tidal-pkce.session.json" && -t 0 ]]; then
     echo
 fi
 
-"$PYTHON" -u -m core.descargar "${1:-}" 2>&1 | tee -a "$LOG_FILE"
+# Sin carpeta: no pasar un argumento vacío (Python lo tomaría como "." y
+# descargaría en el proyecto). Con ${1:+"$1"} el argumento solo existe si hay ruta.
+"$PYTHON" -u -m core.descargar ${1:+"$1"} 2>&1 | tee -a "$LOG_FILE"
 CODE=${PIPESTATUS[0]}
 
 echo "Log: $LOG_FILE"

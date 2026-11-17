@@ -19,6 +19,7 @@ import sys
 import re
 import time
 from collections import defaultdict
+from pathlib import Path
 
 # Pausa entre eliminaciones para no saturar la API
 RATE_LIMIT_DELAY = 0.3
@@ -30,10 +31,15 @@ PAGE_SIZE = 100
 # Aumenta este valor si tu biblioteca supera el límite.
 MAX_TRACKS = 50_000
 
+# Tope de rondas: si Tidal acepta el remove pero la pista sigue en la lista,
+# el bucle no debe quedarse girando para siempre.
+MAX_RONDAS = 20
+
 # Archivo de log con lo que se eliminó
 LOG_ELIMINADOS = "tidal_duplicados_eliminados.txt"
 
 from core import sesion
+from core.coincidencia import clave_cancion, normalizar
 
 try:
     import tidalapi
@@ -171,20 +177,8 @@ def quality_rank(track) -> int:
 
 
 def normalize(text: str) -> str:
-    """
-    Normaliza texto para comparación minuciosa:
-    - Minúsculas
-    - Elimina contenido entre paréntesis y corchetes
-    - Elimina palabras de 'ruido' (Remastered, Anniversary, Live, etc.)
-    - Elimina años y números de edición
-    - Elimina símbolos, deja solo letras y números
-    """
-    text = text.lower()
-    text = re.sub(r"\(.*?\)", " ", text)  # quita (contenido)
-    text = re.sub(r"\[.*?\]", " ", text)  # quita [contenido]
-    text = NOISE_RE.sub(" ", text)  # quita palabras de ruido
-    text = re.sub(r"[^a-z0-9\s]", " ", text)
-    return " ".join(text.split())
+    """Normaliza un título para comparar (ver core/coincidencia.normalizar)."""
+    return normalizar(text)
 
 
 def _parse_track_safe(session, track_data):
@@ -334,19 +328,26 @@ def find_duplicates(tracks):
 
     group[0] siempre es el track que se conserva.
     Devuelve solo los grupos con más de un track.
+
+    Solo se agrupan pistas que son la MISMA grabación. La clave incluye la
+    firma de variante (live, acústica, remix, parte N…), así que «Song» y
+    «Song (Live)», o «Intro (Part 1)» y «Intro (Part 2)», nunca caen en el
+    mismo grupo. Las pistas cuyo título normaliza a vacío no se agrupan con
+    ninguna otra.
     """
     groups = defaultdict(list)
 
     for track in tracks:
         artist = track.artist.name if track.artist else "desconocido"
         title = track.name or ""
-        key = (normalize(artist), normalize(title))
+        key = clave_cancion(artist, title)
+        if key is None:
+            continue  # título vacío tras normalizar: nunca se deduplica
         groups[key].append(track)
 
     duplicates = {}
     for k, v in groups.items():
         if len(v) > 1:
-
             def sort_key(t):
                 qr = quality_rank(t)
                 # version_priority devuelve (remaster_year, explicit, stereo, album, id)
@@ -473,9 +474,7 @@ def main():
     confirm = (
         input(
             "¿Eliminar todos los duplicados automáticamente hasta limpiar la lista? Escribe 'si': "
-        )
-        .strip()
-        .lower()
+        ).strip().lower()
     )
     if confirm not in ("si", "sí", "yes", "s", "y"):
         print("❌ Cancelado. No se eliminó nada.")
@@ -494,14 +493,18 @@ def main():
         )
 
         if eliminated == 0:
-            print(
-                f"\n  ✅ Ronda {round_num}: sin duplicados detectados. ¡Lista limpia!"
-            )
+            print(f"\n  ✅ Ronda {round_num}: sin duplicados detectados. ¡Lista limpia!")
             break
 
         print(
             f"\n  ✅ Ronda {round_num} completada: {eliminated} duplicados eliminados."
         )
+        if round_num >= MAX_RONDAS:
+            print(
+                f"\n  ⚠️  Límite de {MAX_RONDAS} rondas alcanzado; me detengo. "
+                "Revisa el log por si Tidal no está actualizando la lista."
+            )
+            break
         print("     Esperando 3 segundos para que Tidal actualice la lista...")
         time.sleep(3)
         round_num += 1
@@ -521,8 +524,12 @@ def main():
             with open(logs_dir / LOG_ELIMINADOS, "a", encoding="utf-8") as f:
                 f.write("\n".join(all_removed) + "\n")
             print(f"\n  💾 Log guardado en: logs/{LOG_ELIMINADOS}")
-        except Exception:
-            pass
+        except OSError as e:
+            # El log es el único registro de lo borrado: si no se puede
+            # escribir, al menos vuélcalo a la consola.
+            print(f"\n  ⚠️  No se pudo guardar el log ({e}). Lo eliminado fue:")
+            for linea in all_removed:
+                print(f"    {linea}")
 
     print("\n✅ ¡Tu My Tracks está completamente limpio!")
 

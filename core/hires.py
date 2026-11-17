@@ -15,6 +15,8 @@ Uso:
 """
 
 import json
+import os
+import re
 import shutil
 import subprocess
 import sys
@@ -25,7 +27,10 @@ from pathlib import Path
 
 import requests
 
-from core.sesion import SESSION_FILE, sesion  # noqa: F401  (sesion se usa desde app.py y playlists)
+from core.sesion import (
+    SESSION_FILE,
+    sesion,
+)  # noqa: F401  (sesion se usa desde app.py y playlists)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 ESTADO = ".hires.json"  # ISRC → "hires" | "no-hires" | "cifrado"
@@ -65,6 +70,10 @@ def login() -> int:
         print("❌ No se pudo iniciar sesión")
         return 1
     s.save_session_to_file(SESSION_FILE)
+    try:
+        os.chmod(SESSION_FILE, 0o600)  # el archivo lleva los tokens de acceso
+    except OSError:
+        pass
     print(f"✅ Sesión Hi-Res guardada en {SESSION_FILE.name}")
     return 0
 
@@ -94,7 +103,12 @@ def _con_reintentos(fn):
                 continue
             raise
         except Exception as e:
-            if "429" in str(e) and intento < MAX_REINTENTOS:
+            # Respaldo por si tidalapi no envuelve el 429 en HTTPError. Se exige
+            # "429" como número suelto o "too many requests", para no esperar
+            # 60 s por un error cuyo texto lleve 429 dentro de un ID o URL.
+            msg = str(e).lower()
+            es_429 = re.search(r"\b429\b", msg) or "too many requests" in msg
+            if es_429 and intento < MAX_REINTENTOS:
                 time.sleep(ESPERA_429)
                 continue
             raise
@@ -195,8 +209,15 @@ def _mejorar_pista(s, track_id: str, actual: Path, isrc: str) -> tuple[str, str]
         ok, detalle = _verificar(flac, isrc)
         if not ok:
             return "error", detalle
-        shutil.move(str(flac), actual.with_name(actual.name + ".hires-tmp"))
-        actual.with_name(actual.name + ".hires-tmp").replace(actual)
+        # Mover al lado del original y luego reemplazar (átomico en el mismo
+        # disco). Si el replace falla, no dejar el .hires-tmp huérfano.
+        provisional = actual.with_name(actual.name + ".hires-tmp")
+        shutil.move(str(flac), provisional)
+        try:
+            provisional.replace(actual)
+        except OSError:
+            provisional.unlink(missing_ok=True)
+            raise
         return "hires", detalle
 
 
@@ -259,7 +280,7 @@ def mejorar(base: Path):
             if resultado == "hires":
                 mejoradas += 1
                 yield f"   ⬆ {p.stem}: {detalle}"
-        yield f"   {n}/{len(candidatas)}"   # la web lo usa como barra de progreso
+        yield f"   {n}/{len(candidatas)}"  # la web lo usa como barra de progreso
         time.sleep(PAUSA)
 
     yield f"🎚 Hi-Res: {mejoradas} mejorada(s), {errores} con error"

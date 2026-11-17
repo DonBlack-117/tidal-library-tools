@@ -40,7 +40,7 @@ class Pista:
     duracion: int
     disponible: bool
 
-    @classmethod
+    @ classmethod
     def desde_tidal(cls, t) -> "Pista":
         titulo = f"{t.name} ({t.version})" if getattr(t, "version", None) else t.name
         return cls(
@@ -55,17 +55,17 @@ class Pista:
 
 @dataclass
 class Recurso:
-    tipo: str      # track | album | playlist | artist | mix | mytracks
+    tipo: str  # track | album | playlist | artist | mix | mytracks
     id: str
     nombre: str
-    detalle: str   # artista, autor de la playlist o número de álbumes
+    detalle: str  # artista, autor de la playlist o número de álbumes
     pistas: list[Pista] = field(default_factory=list)
 
-    @property
+    @ property
     def requiere_confirmar(self) -> bool:
         return self.tipo in CONFIRMAR
 
-    @property
+    @ property
     def tipo_legible(self) -> str:
         return "My Tracks" if self.tipo == "mytracks" else NOMBRES[self.tipo]
 
@@ -111,43 +111,72 @@ def _obtener(funcion, enlace: Enlace):
     try:
         return funcion(enlace.id)
     except ObjectNotFound as e:
-        raise NoEncontrado(f"Tidal no tiene {ARTICULOS[enlace.tipo]} {NOMBRES[enlace.tipo]} "
-                           "(puede que lo hayan quitado o no esté en tu región)") from e
+        raise NoEncontrado(
+            f"Tidal no tiene {ARTICULOS[enlace.tipo]} {NOMBRES[enlace.tipo]} "
+            "(puede que lo hayan quitado o no esté en tu región)"
+        ) from e
 
 
 def resolver(s, enlace: Enlace) -> Recurso:
     """Recurso con todas sus pistas, consultando a Tidal con la sesión `s`."""
     if enlace.tipo == "track":
         t = _obtener(s.track, enlace)
-        return Recurso("track", enlace.id, t.name, t.artist.name if t.artist else "", _pistas([t]))
+        return Recurso(
+            "track", enlace.id, t.name, t.artist.name if t.artist else "", _pistas([t])
+        )
 
     if enlace.tipo == "album":
         a = _obtener(s.album, enlace)
-        return Recurso("album", enlace.id, a.name, a.artist.name if a.artist else "", _pistas(_paginar(a.tracks)))
+        return Recurso(
+            "album",
+            enlace.id,
+            a.name,
+            a.artist.name if a.artist else "",
+            _pistas(_paginar(a.tracks)),
+        )
 
     if enlace.tipo == "playlist":
         p = _obtener(s.playlist, enlace)
         autor = getattr(getattr(p, "creator", None), "name", "") or ""
         # Tidal pone "me" como autor de las playlists propias
         autor = "tu playlist" if autor.lower() == "me" else autor
-        return Recurso("playlist", enlace.id, p.name.strip(), autor, _pistas(p.tracks_paginated()))
+        return Recurso(
+            "playlist", enlace.id, p.name.strip(), autor, _pistas(p.tracks_paginated())
+        )
 
     if enlace.tipo == "artist":
         a = _obtener(s.artist, enlace)
         albumes = _paginar(a.get_albums) + _paginar(a.get_ep_singles)
         # Una petición por álbum: en paralelo, la discografía tarda segundos y no minutos
         with ThreadPoolExecutor(max_workers=6) as pool:
-            tracks = [t for lista in pool.map(lambda album: _paginar(album.tracks), albumes) for t in lista]
-        return Recurso("artist", enlace.id, a.name, f"{len(albumes)} álbumes y sencillos", _pistas(tracks))
+            tracks = [
+                t
+                for lista in pool.map(lambda album: _paginar(album.tracks), albumes)
+                for t in lista
+            ]
+        return Recurso(
+            "artist",
+            enlace.id,
+            a.name,
+            f"{len(albumes)} álbumes y sencillos",
+            _pistas(tracks),
+        )
 
     m = _obtener(s.mix, enlace)
-    return Recurso("mix", enlace.id, m.title, getattr(m, "sub_title", "") or "", _pistas(m.items()))
+    return Recurso(
+        "mix", enlace.id, m.title, getattr(m, "sub_title", "") or "", _pistas(m.items())
+    )
 
 
 def mis_tracks(s) -> Recurso:
     """Todas las pistas favoritas de la cuenta."""
-    return Recurso("mytracks", "", "My Tracks", "tus canciones favoritas",
-                   _pistas(s.user.favorites.tracks_paginated()))
+    return Recurso(
+        "mytracks",
+        "",
+        "My Tracks",
+        "tus canciones favoritas",
+        _pistas(s.user.favorites.tracks_paginated()),
+    )
 
 
 def pendientes(recurso: Recurso, base: Path) -> list[Pista]:
@@ -159,9 +188,15 @@ def pendientes(recurso: Recurso, base: Path) -> list[Pista]:
     presentes = biblioteca.isrcs_presentes(base)
     sin_isrc = [p for p in recurso.pistas if not p.isrc]
     titulos = biblioteca.titulos_presentes(base) if sin_isrc else set()
-    return [p for p in recurso.pistas if p.disponible and (
-        p.isrc not in presentes if p.isrc
-        else biblioteca.clave_titulo(p.artista, p.titulo) not in titulos)]
+    return [
+        p
+        for p in recurso.pistas
+        if p.disponible and (
+            p.isrc not in presentes
+            if p.isrc
+            else biblioteca.clave_titulo(p.artista, p.titulo) not in titulos
+        )
+    ]
 
 
 def vista_previa(recurso: Recurso, base: Path) -> dict:
@@ -180,7 +215,9 @@ def vista_previa(recurso: Recurso, base: Path) -> dict:
         "no_disponibles": no_disponibles,
         "requiere_confirmar": recurso.requiere_confirmar,
         "crea_lista": recurso.tipo in CON_LISTA,
-        "muestra": [f"{p.artista} - {p.titulo}" if p.artista else p.titulo for p in faltan[:5]],
+        "muestra": [
+            f"{p.artista} - {p.titulo}" if p.artista else p.titulo for p in faltan[: 5]
+        ],
     }
 
 
@@ -190,13 +227,16 @@ def canciones(recurso: Recurso, base: Path) -> list[dict]:
     "falta" (se puede descargar), "tienes" (ya en disco) o "no_disponible".
     """
     faltan = {p.id for p in pendientes(recurso, base)}
-    return [{
-        "id": p.id,
-        "titulo": p.titulo,
-        "artista": p.artista,
-        "duracion": p.duracion,
-        "estado": "no_disponible" if not p.disponible else "falta" if p.id in faltan else "tienes",
-    } for p in recurso.pistas]
+    return [
+        {
+            "id": p.id,
+            "titulo": p.titulo,
+            "artista": p.artista,
+            "duracion": p.duracion,
+            "estado": "no_disponible" if not p.disponible else "falta" if p.id in faltan else "tienes",
+        }
+        for p in recurso.pistas
+    ]
 
 
 class SeleccionInvalida(ValueError):
@@ -212,7 +252,9 @@ def descargar(recurso: Recurso, base: Path, ids: list[int] | None = None):
     if ids is not None:
         desconocidas = set(ids) - {p.id for p in recurso.pistas}
         if desconocidas:
-            raise SeleccionInvalida(f"{len(desconocidas)} canción(es) no son de «{recurso.nombre}»")
+            raise SeleccionInvalida(
+                f"{len(desconocidas)} canción(es) no son de «{recurso.nombre}»"
+            )
 
     info = vista_previa(recurso, base)
     detalle = f" · {recurso.detalle}" if recurso.detalle else ""
@@ -227,8 +269,10 @@ def descargar(recurso: Recurso, base: Path, ids: list[int] | None = None):
         yield f"☑ {len(ids)} elegidas: {ya} ya descargadas, {len(faltan)} por descargar"
     else:
         # Las cifras con este formato las lee la web para el resumen y la barra de progreso
-        yield (f"📋 {info['ya_tienes']} ya descargadas, {info['por_descargar']} por descargar, "
-               f"{info['no_disponibles']} no disponibles en Tidal")
+        yield (
+            f"📋 {info['ya_tienes']} ya descargadas, {info['por_descargar']} por descargar, "
+            f"{info['no_disponibles']} no disponibles en Tidal"
+        )
 
     # hires.mejorar busca el ID de Tidal por ISRC en este registro
     biblioteca.registrar_ids(base, {str(p.id): p.isrc for p in recurso.pistas})
@@ -245,8 +289,9 @@ def descargar(recurso: Recurso, base: Path, ids: list[int] | None = None):
 
     if recurso.tipo in CON_LISTA:
         # Con una selección parcial la lista lleva lo que haya en disco; que falten otras no es error
-        code_lista = yield from playlists.escribir_listas(base, recurso.nombre, recurso.pistas,
-                                                           avisar_faltantes=ids is None)
+        code_lista = yield from playlists.escribir_listas(
+            base, recurso.nombre, recurso.pistas, avisar_faltantes=ids is None
+        )
         code = code or (code_lista if ids is None else 0)
     return code
 
@@ -255,12 +300,23 @@ def _main(argv: list[str]) -> int:
     if not argv:
         print('Uso: python -m core.recursos mytracks|"<link de Tidal>" [carpeta]')
         return 2
-    base = Path(argv[1] if len(argv) > 1 else motor.DEFAULT_OUTPUT_DIR).expanduser()
+    # argv[1] puede venir vacío (p. ej. el .sh pasa "" si no hay carpeta):
+    # tratarlo como "usar la carpeta por defecto", no como "." (el proyecto).
+    carpeta = (
+        argv[1].strip()
+        if len(argv) > 1 and argv[1].strip()
+        else motor.DEFAULT_OUTPUT_DIR
+    )
+    base = Path(carpeta).expanduser()
     s = sesion.sesion()
     if s is None:
         print(f"❌ {sesion.SinSesion()}")
         return 1
-    recurso = mis_tracks(s) if argv[0].lower() == "mytracks" else resolver(s, interpretar(argv[0]))
+    recurso = (
+        mis_tracks(s)
+        if argv[0].lower() == "mytracks"
+        else resolver(s, interpretar(argv[0]))
+    )
     gen = descargar(recurso, base)
     try:
         while True:

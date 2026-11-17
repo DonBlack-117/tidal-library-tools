@@ -23,7 +23,6 @@ AUDIO_EXT = (".flac", ".m4a")
 ATMOS_SUFFIX = " [Dolby Atmos]"
 
 
-
 _CACHE_TAGS: dict[tuple[str, int, int], dict] = {}
 
 
@@ -87,7 +86,9 @@ def isrcs_presentes(base: Path) -> set[str]:
 
 def clave_titulo(artista: str, titulo: str) -> str:
     """Artista y título normalizados (sin acentos ni mayúsculas) para comparar."""
-    texto = unicodedata.normalize("NFKD", f"{artista} - {titulo}").encode("ascii", "ignore").decode()
+    texto = unicodedata.normalize("NFKD", f"{artista} - {titulo}").encode(
+        "ascii", "ignore"
+    ).decode()
     return re.sub(r"\s+", " ", texto).strip().casefold()
 
 
@@ -96,8 +97,11 @@ def titulos_presentes(base: Path) -> set[str]:
     carpeta = base / CANCIONES
     if not carpeta.is_dir():
         return set()
-    return {clave_titulo(t.get("artist", ""), t.get("title", ""))
-            for p in carpeta.iterdir() if p.suffix in AUDIO_EXT and (t := _tags(p))}
+    return {
+        clave_titulo(t.get("artist", ""), t.get("title", ""))
+        for p in carpeta.iterdir()
+        if p.suffix in AUDIO_EXT and (t := _tags(p))
+    }
 
 
 def _flac_hires(path: Path) -> bool:
@@ -113,7 +117,7 @@ def _flac_hires(path: Path) -> bool:
         return False
     if len(b) < 42 or b[:4] != b"fLaC":
         return False
-    d = b[8:]                                   # datos de STREAMINFO
+    d = b[8:]  # datos de STREAMINFO
     rate = (d[10] << 12) | (d[11] << 4) | (d[12] >> 4)
     bits = (((d[12] & 0x01) << 4) | (d[13] >> 4)) + 1
     return bits > 16 or rate > 44100
@@ -122,7 +126,11 @@ def _flac_hires(path: Path) -> bool:
 def estadisticas(base: Path) -> dict:
     """Números de la biblioteca para la franja de estado de la web."""
     carpeta = base / CANCIONES
-    audio = [p for p in carpeta.iterdir() if p.suffix in AUDIO_EXT] if carpeta.is_dir() else []
+    audio = (
+        [p for p in carpeta.iterdir() if p.suffix in AUDIO_EXT]
+        if carpeta.is_dir()
+        else []
+    )
     tam = sum(p.stat().st_size for p in audio)
     letras = base / LYRICS
     listas = base / "playlists"
@@ -130,7 +138,9 @@ def estadisticas(base: Path) -> dict:
         "canciones": len(audio),
         "hires": sum(1 for p in audio if p.suffix == ".flac" and _flac_hires(p)),
         "letras": len(list(letras.glob("*.lrc"))) if letras.is_dir() else 0,
-        "playlists": sorted(p.stem for p in listas.glob("*.m3u8")) if listas.is_dir() else [],
+        "playlists": sorted(
+            p.stem for p in listas.glob("*.m3u8")
+        ) if listas.is_dir() else [],
         "gb": round(tam / 1024 ** 3, 1),
     }
 
@@ -142,7 +152,7 @@ def _seguro(texto: str) -> str:
     que los nombres se comparen igual en la laptop y en el teléfono.
     """
     texto = unicodedata.normalize("NFC", texto)
-    return re.sub(r'[:*?<>|\\]', "-", texto.replace('"', "'"))
+    return re.sub(r"[:*?<>|\\]", "-", texto.replace('"', "'"))
 
 
 def _limpio(texto: str) -> str:
@@ -162,7 +172,9 @@ def _nombre_libre(carpeta: Path, nombre: str, ext: str, tags: dict) -> str:
     if tags.get("artist"):
         candidatos.append(f"{nombre} - {_limpio(tags['artist'])}")
         if tags.get("album"):
-            candidatos.append(f"{nombre} - {_limpio(tags['artist'])} ({_limpio(tags['album'])})")
+            candidatos.append(
+                f"{nombre} - {_limpio(tags['artist'])} ({_limpio(tags['album'])})"
+            )
     for c in candidatos:
         if not (carpeta / (c + ext)).exists():
             return c
@@ -186,7 +198,7 @@ def aplanar(base: Path):
     lyrics.mkdir(parents=True, exist_ok=True)
 
     presentes = isrcs_locales(base)
-    movidas = repetidas = 0
+    movidas = repetidas = fallos = 0
 
     for audio in sorted(p for p in staging.rglob("*") if p.suffix in AUDIO_EXT):
         tags = _tags(audio)
@@ -195,19 +207,30 @@ def aplanar(base: Path):
             repetidas += 1
             continue
         nombre = _nombre_libre(canciones, _nombre_base(audio), audio.suffix, tags)
-        shutil.move(str(audio), canciones / (nombre + audio.suffix))
-        lrc = audio.with_suffix(".lrc")
-        if lrc.exists():
-            shutil.move(str(lrc), lyrics / (nombre + ".lrc"))
+        try:
+            shutil.move(str(audio), canciones / (nombre + audio.suffix))
+            lrc = audio.with_suffix(".lrc")
+            if lrc.exists():
+                shutil.move(str(lrc), lyrics / (nombre + ".lrc"))
+        except OSError as e:
+            # No perder la pista en silencio ni borrar el staging con ella dentro.
+            fallos += 1
+            yield f"⚠ No se pudo mover {audio.name}: {e}"
+            continue
         if clave[0]:
             presentes.add(clave)
         movidas += 1
 
-    shutil.rmtree(staging, ignore_errors=True)
+    # Solo borrar el staging si todo se movió: si hubo fallos, dejarlo para el
+    # siguiente intento en vez de borrar lo que quedó sin mover.
+    if fallos == 0:
+        shutil.rmtree(staging, ignore_errors=True)
     if movidas:
         yield f"📂 {movidas} canción(es) nuevas en {canciones}"
     if repetidas:
         yield f"↩ {repetidas} descartada(s): ya estaban en {CANCIONES}/ (mismo ISRC)"
+    if fallos:
+        yield f"⚠ {fallos} archivo(s) no se movieron; {STAGING}/ se conserva para reintentar"
 
 
 def _cargar_registro(base: Path) -> dict[str, str | None]:

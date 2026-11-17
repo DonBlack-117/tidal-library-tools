@@ -20,8 +20,10 @@ import sys
 import re
 import time
 from collections import defaultdict
+from pathlib import Path
 
 from core import sesion
+from core.coincidencia import firma_variante, normalizar
 
 try:
     import tidalapi
@@ -109,13 +111,8 @@ def qlabel(track) -> str:
 
 
 def normalize(text: str) -> str:
-    """Normaliza un texto para comparación: minúsculas, sin ruido, sin símbolos."""
-    text = text.lower()
-    text = re.sub(r"\(.*?\)", " ", text)
-    text = re.sub(r"\[.*?\]", " ", text)
-    text = NOISE_RE.sub(" ", text)
-    text = re.sub(r"[^a-z0-9\s]", " ", text)
-    return " ".join(text.split())
+    """Normaliza un título para comparar (ver core/coincidencia.normalizar)."""
+    return normalizar(text)
 
 
 def track_label(track) -> str:
@@ -276,6 +273,12 @@ def search_better_version(session, track):
     query = f"{artist_name} {title}"
     norm_artist = normalize(artist_name)
     norm_title = normalize(title)
+    firma_actual = firma_variante(title)
+
+    # Sin título normalizable (p. ej. «1999», «(Untitled)») no se puede
+    # identificar la misma grabación: mejor no tocar el favorito.
+    if not norm_title:
+        return None
 
     try:
         results = session.search(query, models=[tidalapi.Track], limit=20)
@@ -302,6 +305,10 @@ def search_better_version(session, track):
         if normalize(cand_artist) != norm_artist:
             continue
         if normalize(cand_title) != norm_title:
+            continue
+        # Misma grabación: no cambiar el estudio por una versión en vivo,
+        # acústica o remix solo porque tenga mayor calidad.
+        if firma_variante(cand_title) != firma_actual:
             continue
 
         cand_rank = quality_rank(candidate)
@@ -458,8 +465,11 @@ def main():
             with open(logs_dir / LOG_MEJORADAS, "a", encoding="utf-8") as f:
                 f.write("\n\n".join(log_entries) + "\n")
             print(f"\n  💾 Log guardado en: logs/{LOG_MEJORADAS}")
-        except Exception:
-            pass
+        except OSError as e:
+            # El log es el único rastro de qué original se reemplazó.
+            print(f"\n  ⚠️  No se pudo guardar el log ({e}). Lo mejorado fue:")
+            for entrada in log_entries:
+                print(f"    {entrada}")
 
     if errors:
         print("\n  Errores detallados:")

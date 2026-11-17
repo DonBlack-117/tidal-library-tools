@@ -59,7 +59,9 @@ def _tiddl_exe() -> str:
         return str(venv_exe)
     exe = shutil.which("tiddl")
     if not exe:
-        raise FileNotFoundError("tiddl no encontrado. Instala con: .venv/bin/pip install tiddl")
+        raise FileNotFoundError(
+            "tiddl no encontrado. Instala con: .venv/bin/pip install tiddl"
+        )
     return exe
 
 
@@ -68,7 +70,7 @@ def _env() -> dict[str, str]:
         **os.environ,
         "PYTHONUNBUFFERED": "1",
         "PYTHONIOENCODING": "utf-8",  # evita UnicodeEncodeError con caracteres Rich
-        "COLUMNS": "250",             # evita que Rich parta las rutas en varias líneas
+        "COLUMNS": "250",  # evita que Rich parta las rutas en varias líneas
     }
 
 
@@ -97,7 +99,9 @@ def _vigilar(process: subprocess.Popen, vigilar_dir: Path | None, estado: dict) 
     """
     while process.poll() is None:
         time.sleep(15)
-        inactivo = time.time() - max(_ultima_actividad(vigilar_dir), estado["ultima_linea"])
+        inactivo = time.time() - max(
+            _ultima_actividad(vigilar_dir), estado["ultima_linea"]
+        )
         if inactivo > INACTIVIDAD_MAX and process.poll() is None:
             estado["estancado"] = True
             process.terminate()
@@ -108,8 +112,12 @@ def _vigilar(process: subprocess.Popen, vigilar_dir: Path | None, estado: dict) 
             return
 
 
-def _ejecutar(cmd: list[str], errores: list[str], silenciar_existentes: bool = False,
-              vigilar_dir: Path | None = None):
+def _ejecutar(
+    cmd: list[str],
+    errores: list[str],
+    silenciar_existentes: bool = False,
+    vigilar_dir: Path | None = None,
+):
     """
     Ejecuta tiddl haciendo yield de cada línea. Devuelve el código de salida.
     Las líneas de error se añaden a `errores`; si tiddl se cuelga, se termina
@@ -132,7 +140,9 @@ def _ejecutar(cmd: list[str], errores: list[str], silenciar_existentes: bool = F
         return 1
 
     estado = {"ultima_linea": time.time(), "estancado": False}
-    threading.Thread(target=_vigilar, args=(process, vigilar_dir, estado), daemon=True).start()
+    threading.Thread(
+        target=_vigilar, args=(process, vigilar_dir, estado), daemon=True
+    ).start()
 
     try:
         for line in iter(process.stdout.readline, ""):
@@ -140,7 +150,10 @@ def _ejecutar(cmd: list[str], errores: list[str], silenciar_existentes: bool = F
             line = line.rstrip()
             if line.startswith(_ERROR_PREFIXES):
                 errores.append(line)
-            if silenciar_existentes and line.startswith(("Exists ", "Skipping ", "Auth token")):
+            if (
+                silenciar_existentes
+                and line.startswith(("Exists ", "Skipping ", "Auth token"))
+            ):
                 continue
             yield line
     finally:
@@ -163,12 +176,15 @@ def _ejecutar(cmd: list[str], errores: list[str], silenciar_existentes: bool = F
 
 # ── Favoritos (para IDs, ISRC y detección de Atmos) ──────────────────────────
 
+
 class _Favoritos:
     """Índice perezoso de las pistas favoritas, usando la API (y la caché) de tiddl."""
 
     def __init__(self) -> None:
         self._por_titulo_album: dict[tuple[str, str], object] | None = None
         self._por_titulo: dict[str, list] = {}
+        self.error: str | None = None  # fallo al cargar el índice, para avisarlo
+        self.fallos: int = 0  # pistas que no se pudieron leer
 
     def _cargar(self) -> None:
         self._por_titulo_album = {}
@@ -180,14 +196,25 @@ class _Favoritos:
             for tid in api.get_favorites().model_dump()["TRACK"]:
                 try:
                     t = api.get_track(tid)
-                except Exception:
+                except Exception as e:
+                    # No cortar el índice por una pista, pero contarlo: una
+                    # sesión caducada o un 429 dejaría el índice incompleto y
+                    # se perderían ISRC y detección de Atmos sin avisar.
+                    self.fallos += 1
+                    print(
+                        f"⚠ favoritos: no se pudo leer la pista {tid}: {e!r}",
+                        file=sys.stderr,
+                    )
                     continue
                 titulo = f"{t.title} ({t.version})" if t.version else t.title
-                self._por_titulo_album[(titulo.casefold(), t.album.title.casefold())] = t
+                self._por_titulo_album[(titulo.casefold(), t.album.title.casefold())] = (
+                    t
+                )
                 self._por_titulo.setdefault(t.title.casefold(), []).append(t)
                 self._por_titulo.setdefault(titulo.casefold(), []).append(t)
-        except Exception:
-            pass
+        except Exception as e:
+            self.error = repr(e)
+            print(f"⚠ favoritos: no se pudo cargar el índice: {e!r}", file=sys.stderr)
 
     def buscar(self, titulo: str, album: str):
         if self._por_titulo_album is None:
@@ -203,18 +230,32 @@ class _Favoritos:
 def _anotar_atmos(track_id, titulo: str, album: str, motivo: str) -> None:
     LOGS_DIR.mkdir(exist_ok=True)
     with open(ATMOS_LOG, "a", encoding="utf-8") as f:
-        f.write(f"{datetime.now():%Y-%m-%d %H:%M:%S}\t{track_id}\t{titulo}\t{album}\t{motivo}\n")
+        f.write(
+            f"{datetime.now():%Y-%m-%d %H:%M:%S}\t{track_id}\t{titulo}\t{album}\t{motivo}\n"
+        )
 
 
 # ── Post-proceso ──────────────────────────────────────────────────────────────
 
+
 def _ffprobe_audio(path: Path) -> dict:
     try:
         out = subprocess.run(
-            ["ffprobe", "-v", "error", "-select_streams", "a:0",
-             "-show_entries", "stream=codec_name,codec_tag_string",
-             "-of", "json", str(path)],
-            capture_output=True, text=True, timeout=30,
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "a:0",
+                "-show_entries",
+                "stream=codec_name,codec_tag_string",
+                "-of",
+                "json",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         streams = json.loads(out.stdout or "{}").get("streams", [])
         return streams[0] if streams else {}
@@ -226,11 +267,17 @@ def _decoder_disponible(codec: str) -> bool:
     if not codec or not shutil.which("ffmpeg"):
         return False
     try:
-        out = subprocess.run(["ffmpeg", "-hide_banner", "-decoders"],
-                             capture_output=True, text=True, timeout=15).stdout
+        out = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-decoders"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        ).stdout
     except Exception:
         return False
-    return any(len(p) > 1 and p[1] == codec for p in (l.split() for l in out.splitlines()))
+    return any(
+        len(p) > 1 and p[1] == codec for p in (l.split() for l in out.splitlines())
+    )
 
 
 def _esta_cifrado(path: Path, info: dict) -> bool:
@@ -246,10 +293,28 @@ def _esta_cifrado(path: Path, info: dict) -> bool:
     except OSError:
         return True
     if _decoder_disponible(info.get("codec_name", "")):
-        r = subprocess.run(
-            ["ffmpeg", "-v", "error", "-t", "10", "-i", str(path), "-f", "null", "-"],
-            capture_output=True, text=True, timeout=120,
-        )
+        try:
+            r = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-v",
+                    "error",
+                    "-t",
+                    "10",
+                    "-i",
+                    str(path),
+                    "-f",
+                    "null",
+                    "-",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        except (subprocess.TimeoutExpired, OSError):
+            # No se pudo decidir: NO borrar el archivo por las dudas (quedarse
+            # con un Atmos de más es mejor que borrar uno válido).
+            return False
         return r.returncode != 0 or bool(r.stderr.strip())
     return False
 
@@ -305,7 +370,11 @@ def _postprocesar(output_dir: str, errores: list[str]):
                 except Exception:
                     pass
 
-        if es_atmos and path.with_suffix(".flac").exists() and not path.stem.endswith(ATMOS_SUFFIX):
+        if (
+            es_atmos
+            and path.with_suffix(".flac").exists()
+            and not path.stem.endswith(ATMOS_SUFFIX)
+        ):
             destino = path.with_name(path.stem + ATMOS_SUFFIX + ".m4a")
             path.rename(destino)
             lrc = path.with_suffix(".lrc")
@@ -322,7 +391,7 @@ def _postprocesar(output_dir: str, errores: list[str]):
         for linea in errores:
             if not linea.startswith("Error "):
                 continue
-            titulo = linea[len("Error "):].rsplit(" - ", 1)[0].strip()
+            titulo = linea[len("Error ") :].rsplit(" - ", 1)[0].strip()
             for t in favoritos.buscar_titulo(titulo):
                 if "DOLBY_ATMOS" in (t.audioModes or []):
                     _anotar_atmos(t.id, t.title, t.album.title, f"error tiddl: {linea}")
@@ -335,10 +404,17 @@ def _postprocesar(output_dir: str, errores: list[str]):
         yield f"🎧 {renombradas} versión(es) Dolby Atmos guardadas junto a su versión estéreo"
     if isrc_fix:
         yield f"🏷 ISRC añadido a {isrc_fix} archivo(s) M4A"
+    # Si el índice de favoritos no se cargó bien, el post-proceso (ISRC y
+    # detección de Atmos) quedó incompleto: avisarlo en vez de callarlo.
+    if favoritos.error:
+        yield f"⚠ No se pudo leer tus favoritos de Tidal ({favoritos.error}); ISRC y Atmos pueden quedar incompletos"
+    elif favoritos.fallos:
+        yield f"⚠ {favoritos.fallos} favorito(s) no se pudieron leer; algún ISRC o Atmos pudo quedar sin resolver"
 
 
-def _pasada_con_reintentos(cmd: list[str], nombre: str, vigilar_dir: Path,
-                           silenciar_existentes: bool = False):
+def _pasada_con_reintentos(
+    cmd: list[str], nombre: str, vigilar_dir: Path, silenciar_existentes: bool = False
+):
     """
     Ejecuta una pasada de tiddl. Si Tidal limita la tasa (429) o tiddl se
     cuelga, espera y repite: lo ya descargado se salta, así que solo se
@@ -351,8 +427,11 @@ def _pasada_con_reintentos(cmd: list[str], nombre: str, vigilar_dir: Path,
         estancado = any(e.startswith("Estancado") for e in errores)
         if not (limitadas or estancado) or intento > MAX_REINTENTOS_429:
             return code, errores
-        motivo = (f"{limitadas} pista(s) rechazadas por límite de Tidal (429)"
-                  if limitadas else "tiddl se colgó")
+        motivo = (
+            f"{limitadas} pista(s) rechazadas por límite de Tidal (429)"
+            if limitadas
+            else "tiddl se colgó"
+        )
         yield ""
         yield f"⏳ {nombre}: {motivo}; reintento {intento}/{MAX_REINTENTOS_429} en {ESPERA_429}s"
         time.sleep(ESPERA_429)
@@ -395,13 +474,19 @@ def _descargar(destino_args: list[str], output_dir: str):
     yield ""
 
     code, errores = yield from _pasada_con_reintentos(
-        [exe, *opciones, "-da", "allow", *destino_args], "Primera pasada", Path(output_dir))
+        [exe, *opciones, "-da", "allow", *destino_args],
+        "Primera pasada",
+        Path(output_dir),
+    )
 
     yield ""
     yield "▶ Segunda pasada: versión estéreo de las pistas que también tienen Dolby Atmos"
     code2, errores_estereo = yield from _pasada_con_reintentos(
-        [*estereo, *opciones, "-da", "none", *destino_args], "Segunda pasada",
-        Path(output_dir), silenciar_existentes=True)
+        [*estereo, *opciones, "-da", "none", *destino_args],
+        "Segunda pasada",
+        Path(output_dir),
+        silenciar_existentes=True,
+    )
     # Los errores que ya salieron en la primera pasada no se duplican
     errores += [e for e in errores_estereo if e not in errores]
 
@@ -411,7 +496,12 @@ def _descargar(destino_args: list[str], output_dir: str):
     # tiddl solo recibe 16-bit; lo que Tidal tiene en Hi-Res se mejora aparte
     yield ""
     code3 = yield from hires.mejorar(base)
-    return code or code2 or code3
+    # Si hubo errores o tiddl se estancó, no reportar éxito (código 0) aunque el
+    # último intento devolviera 0: el .sh y la web dirían "Descarga completada".
+    final = code or code2 or code3
+    if not final and errores:
+        final = 1
+    return final
 
 
 def descargar_pistas(ids: list[int | str], base: Path):
@@ -435,9 +525,9 @@ def verificar_tiddl() -> tuple[bool, str]:
             timeout=12,
             env=_env(),
         )
-        ok   = result.returncode == 0
+        ok = result.returncode == 0
         msgs = (result.stdout + result.stderr).strip().splitlines()
-        msg  = msgs[0] if msgs else ("Autenticado" if ok else "No autenticado")
+        msg = msgs[0] if msgs else ("Autenticado" if ok else "No autenticado")
         return ok, msg
     except subprocess.TimeoutExpired:
         return False, "Tiempo de espera agotado al verificar tiddl"
@@ -449,4 +539,4 @@ if __name__ == "__main__":
     # Uso: python -m core.descargar [carpeta]   → descarga My Tracks
     from core.recursos import _main
 
-    sys.exit(_main(["mytracks", *sys.argv[1:2]]))
+    sys.exit(_main(["mytracks", *sys.argv[1 : 2]]))

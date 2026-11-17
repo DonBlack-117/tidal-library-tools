@@ -4,4 +4,4 @@
 # necesita internet ni Node para correr.
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")/.."
-npx --yes tailwindcss@3 -c tailwind.config.js -i static/css/input.css -o static/css/app.css --minify
+npx --yes tailwindcss@3.4.17 -c tailwind.config.js -i static/css/input.css -o static/css/app.css --minify
