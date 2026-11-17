@@ -19,12 +19,12 @@ USO:
 
 import os
 import sys
-import re
 import time
 import json
 from pathlib import Path
 
 from core import sesion
+from core.coincidencia import firma_variante, normalizar
 
 try:
     import tidalapi
@@ -106,18 +106,24 @@ def get_songs_from_folder(music_dir: str) -> list[tuple[str, str, str]]:
 
 
 def normalize(text: str) -> str:
-    """Normaliza texto para comparación."""
-    text = text.lower()
-    text = re.sub(r"\(.*?\)", "", text)  # quita paréntesis y contenido
-    text = re.sub(r"\[.*?\]", "", text)  # quita corchetes
-    text = re.sub(r"[^a-z0-9\s]", " ", text)
-    return " ".join(text.split())
+    """Normaliza un título para comparar (ver core/coincidencia.normalizar)."""
+    return normalizar(text)
 
 
 def find_best_match(results_tracks, artist: str, title: str):
-    """Elige el track de Tidal que mejor corresponde al artista y título locales."""
+    """
+    Elige el track de Tidal que corresponde al artista y título locales.
+
+    El título tiene que coincidir exacto (ya normalizado) y con la misma firma
+    de variante, para no agregar «Love Me Do» cuando el archivo es «Love» ni
+    una versión en vivo por una de estudio. El artista admite coincidencia por
+    subcadena, pero nunca con cadenas vacías.
+    """
     artist_norm = normalize(artist)
     title_norm = normalize(title)
+    if not artist_norm or not title_norm:
+        return None  # sin datos fiables, no se agrega nada
+    firma = firma_variante(title)
 
     for track in results_tracks[:10]:
         tidal_artist = track.artist.name if track.artist else ""
@@ -125,20 +131,28 @@ def find_best_match(results_tracks, artist: str, title: str):
 
         ta = normalize(tidal_artist)
         tt = normalize(tidal_title)
+        if not ta or not tt:
+            continue
 
-        # Match exacto o contenido
         artist_match = (artist_norm in ta) or (ta in artist_norm)
-        title_match = (title_norm in tt) or (tt in title_norm)
+        title_match = tt == title_norm and firma_variante(tidal_title) == firma
 
         if artist_match and title_match:
             return track
 
-    # Sin match exacto → no agregar para evitar canciones incorrectas
+    # Sin coincidencia fiable → no agregar para evitar canciones incorrectas
     return None
 
 
+# Sentinel: la búsqueda falló (red/429), distinto de "no hay resultados" (None).
+ERROR_BUSQUEDA = object()
+
+
 def search_track(session, artist: str, title: str):
-    """Busca un track en Tidal y devuelve el mejor match o None."""
+    """
+    Busca un track en Tidal. Devuelve el mejor match, None si no hay ninguno,
+    o ERROR_BUSQUEDA si la llamada falló (para no contarlo como «no encontrada»).
+    """
     query = f"{artist} {title}"
     try:
         results = session.search(query, models=[tidalapi.Track], limit=20)
@@ -147,6 +161,7 @@ def search_track(session, artist: str, title: str):
             return find_best_match(tracks, artist, title)
     except Exception as e:
         print(f"\n  ⚠️  Error buscando '{query}': {e}")
+        return ERROR_BUSQUEDA
     return None
 
 
@@ -230,8 +245,12 @@ def main():
         print()
         print(f"✅ Tienes {len(existing_ids)} canciones en My Tracks")
     except Exception as e:
-        print(f"⚠️  No se pudieron obtener favoritos: {e}")
-        existing_ids = set()
+        # Sin la lista real de favoritos, todo parecería nuevo y se re-agregarían
+        # duplicados. Mejor abortar que ensuciar la cuenta.
+        print(
+            f"❌ No se pudieron obtener tus favoritos ({e}); abortando para no duplicar."
+        )
+        return 1
 
     # ── 3. Leer archivos locales ──────────────────────────────────
     print(f"\n[3/4] Leyendo canciones de:\n  {MUSIC_DIR}")
@@ -255,7 +274,11 @@ def main():
 
         track = search_track(session, artist, title)
 
-        if track is None:
+        if track is ERROR_BUSQUEDA:
+            print("⚠️  Error de búsqueda")
+            errors.append(f"{label}: búsqueda fallida (red/limite)")
+
+        elif track is None:
             print("❌ No encontrada")
             not_found.append(label)
 
@@ -309,6 +332,7 @@ def main():
         print(f"  💾 Ya existían          → {LOG_YA_EXISTIAN}")
 
     print("\n✅ ¡Proceso completado!")
+    return 1 if errors else 0
 
 
 if __name__ == "__main__":

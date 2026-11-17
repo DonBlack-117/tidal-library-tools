@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# Mínimo: el token solo necesita leer el repo para correr las pruebas.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
