@@ -15,6 +15,7 @@ let existsCount = 0;
 const listeners = [];      // se avisan al terminar (estado de la biblioteca, teléfono)
 
 export const isRunning = () => running;
+export const lastStats = () => ({ ...stats });
 export const onFinish = (fn) => listeners.push(fn);
 
 // ── Iconos ────────────────────────────────────────────────────────────────────
@@ -133,6 +134,7 @@ export function processLine(line) {
   if ((m = line.match(/(\d+) ya descargad/))) stats.already = +m[1];
   if ((m = line.match(/(\d+) no disponibles/))) stats.unavailable = +m[1];
   if ((m = line.match(/^📂 (\d+) canci/))) stats.newSongs = +m[1];
+  if ((m = line.match(/^🔎 (\d+) copia\(s\) por eliminar/))) stats.dupesPending = +m[1];
   if ((m = line.match(/^↩ (\d+) descartada/))) stats.discarded = +m[1];
   if ((m = line.match(/Hi-Res: (\d+) mejorada/))) stats.hires = +m[1];
   if ((m = line.match(/Copiados (\d+)/))) stats.copied = +m[1];

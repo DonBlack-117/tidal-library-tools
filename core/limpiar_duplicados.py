@@ -14,9 +14,9 @@ USO:
   python limpiar_duplicados_tidal.py
 """
 
-import sys
-
+import os
 import re
+import sys
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -37,6 +37,10 @@ MAX_RONDAS = 20
 
 # Archivo de log con lo que se eliminó
 LOG_ELIMINADOS = "tidal_duplicados_eliminados.txt"
+
+# La web corre primero solo la vista previa (lista completa, sin borrar nada) y
+# pide confirmar con un segundo clic; ver /run/dupes en app.py
+SOLO_VISTA_ENV = "TIDAL_DUPES_SOLO_VISTA"
 
 from core import sesion
 from core.coincidencia import clave_cancion, normalizar
@@ -388,7 +392,7 @@ def remove_duplicates_round(session, round_num, all_removed, all_errors):
     )
 
     eliminated = 0
-    for (_, _), group in duplicates.items():
+    for group in duplicates.values():
         keeper = group[0]
         extras = group[1:]
         keeper_label = (
@@ -452,8 +456,10 @@ def main():
     print(f"\n  ⚠️  Se encontraron {len(duplicates)} grupos de canciones repetidas.")
     print(f"     (pueden aparecer más en rondas siguientes al actualizarse la lista)\n")
 
-    print("  Vista previa (primeros 10 grupos):")
-    for (_, _), group in list(duplicates.items())[:10]:
+    solo_vista = os.environ.get(SOLO_VISTA_ENV) == "1"
+    mostrar = len(duplicates) if solo_vista else 10
+    print("  Vista previa:" if solo_vista else "  Vista previa (primeros 10 grupos):")
+    for group in list(duplicates.values())[:mostrar]:
         keeper = group[0]
         keeper_label = (
             f"{keeper.artist.name} - {keeper.name}" if keeper.artist else keeper.name
@@ -468,8 +474,13 @@ def main():
             print(f"  ✗ Eliminar  : {t_label}  [{t_q}]  (álbum: {t_album})")
         print()
 
-    if len(duplicates) > 10:
-        print(f"  ... y {len(duplicates) - 10} grupos más.\n")
+    if len(duplicates) > mostrar:
+        print(f"  ... y {len(duplicates) - mostrar} grupos más.\n")
+
+    if solo_vista:
+        # La web lee esta línea para ofrecer «Eliminar N»
+        print(f"🔎 {total_to_remove} copia(s) por eliminar. No se borró nada todavía.")
+        return 0
 
     confirm = (
         input(

@@ -185,3 +185,28 @@ def test_movil_sin_scroll_horizontal(page, app_url):
     assert page.evaluate("document.documentElement.scrollWidth - innerWidth") <= 0
     expect(page.get_by_test_id("link-input")).to_be_visible()
     assert re.search("Pega un link", page.content())
+
+
+def test_duplicados_pide_un_segundo_clic(pagina, monkeypatch):
+    llamadas = []
+
+    def falso(modulo, env, confirmar):
+        llamadas.append(confirmar)
+        if confirmar:
+            yield "  ✅ Total eliminados      : 2"
+        else:
+            yield "  ✗ Eliminar  : Artista - Uno  [Lossless (FLAC)]  (álbum: Disco)"
+            yield "🔎 2 copia(s) por eliminar. No se borró nada todavía."
+        return 0
+
+    monkeypatch.setattr(servidor, "_proceso", falso)
+    boton = pagina.page.locator('[data-tool="dupes"]')
+    boton.click()
+    expect(boton).to_have_text("Eliminar 2")
+    expect(pagina.registro).to_contain_text("No se borró nada")
+    assert llamadas == [False]
+
+    boton.click()
+    expect(pagina.registro).to_contain_text("Total eliminados")
+    expect(boton).to_have_text("Ejecutar")
+    assert llamadas == [False, True]

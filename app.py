@@ -22,7 +22,7 @@ from urllib.parse import urlparse
 
 from flask import Flask, Response, jsonify, render_template, request, stream_with_context
 
-from core import sesion
+from core import procesos, sesion
 from core.enlaces import EnlaceInvalido, interpretar
 
 app = Flask(__name__)
@@ -36,8 +36,9 @@ SCRIPTS = {
     "quality": "core.mejorar_calidad",
     "dupes": "core.limpiar_duplicados",
 }
-# Piden "si" a mitad de la ejecución; el clic en Ejecutar ya es la confirmación
-AUTO_CONFIRM = {"quality", "dupes"}
+# Piden "si" a mitad de la ejecución; el clic en Ejecutar ya es la confirmación.
+# Duplicados no: sin {"confirmado": true} solo corre la vista previa (borra favoritos).
+AUTO_CONFIRM = {"quality"}
 
 # Una sola operación a la vez: todas escriben en la misma biblioteca
 _operacion = threading.Lock()
@@ -161,6 +162,7 @@ def _proceso(modulo: str, env: dict, confirmar: bool):
     except OSError as e:
         yield f"❌ Error al iniciar el script: {e}"
         return 1
+    procesos.registrar(proc, grupo=True)
     if confirmar:
         proc.stdin.write("si\n")
         proc.stdin.close()
@@ -171,7 +173,9 @@ def _proceso(modulo: str, env: dict, confirmar: bool):
         if proc.poll() is None:  # el usuario detuvo la operación
             _terminar(proc)
         proc.stdout.close()
-    return proc.wait()
+        codigo = proc.wait()
+        procesos.quitar(proc)
+    return codigo
 
 
 def _terminar(proc: subprocess.Popen) -> None:
@@ -339,10 +343,18 @@ def run_script(script):
     if script not in SCRIPTS:
         return error("NO_EXISTE", "Herramienta no válida", 404)
     env = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}
-    music_dir = _texto(_datos(), "music_dir").strip()
+    datos = _datos()
+    music_dir = _texto(datos, "music_dir").strip()
     if music_dir:
         env["TIDAL_MUSIC_DIR"] = music_dir
-    return _sse(_proceso(SCRIPTS[script], env, script in AUTO_CONFIRM))
+    confirmar = script in AUTO_CONFIRM
+    if script == "dupes":
+        confirmar = datos.get("confirmado") is True
+        if not confirmar:
+            from core.limpiar_duplicados import SOLO_VISTA_ENV
+
+            env[SOLO_VISTA_ENV] = "1"
+    return _sse(_proceso(SCRIPTS[script], env, confirmar))
 
 
 @app.post("/pick-folder")
@@ -366,9 +378,11 @@ def pick_folder():
 
 @app.post("/shutdown")
 def shutdown():
-    """Cierra el servidor después de responder."""
+    """Cierra el servidor después de responder, sin dejar subprocesos huérfanos."""
     def parar():
         time.sleep(0.3)  # margen para que el navegador reciba la respuesta
+        # os._exit no corre los finally de los generadores en curso
+        procesos.terminar_todos()
         os._exit(0)
 
     threading.Thread(target=parar, daemon=True).start()
