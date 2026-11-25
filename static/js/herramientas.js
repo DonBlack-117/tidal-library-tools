@@ -10,9 +10,32 @@ const TOOL_TITLES = {
   dupes: 'Quitando duplicados',
 };
 
+// Duplicados en dos clics: el primero solo muestra la lista; si hay copias, el
+// botón pasa a «Eliminar N» y el segundo clic confirma.
+let dupesPendientes = 0;
+
 export function runTool(tool) {
+  if (tool === 'dupes') return runDupes();
   return operacion.run(`/run/${tool}`, { music_dir: $('music-dir').value.trim() },
                        { title: TOOL_TITLES[tool], icon: tool });
+}
+
+async function runDupes() {
+  const btn = document.querySelector('[data-tool="dupes"]');
+  const confirmar = dupesPendientes > 0;
+  dupesPendientes = 0;
+  btn.textContent = 'Ejecutar';
+  const body = { music_dir: $('music-dir').value.trim() };
+  if (confirmar) body.confirmado = true;
+  const ok = await operacion.run('/run/dupes', body, {
+    title: confirmar ? TOOL_TITLES.dupes : 'Buscando duplicados (vista previa)',
+    icon: 'dupes',
+  });
+  const n = operacion.lastStats().dupesPending || 0;
+  if (!confirmar && ok && n > 0) {
+    dupesPendientes = n;
+    btn.textContent = `Eliminar ${n}`;
+  }
 }
 
 export function runHires() {

@@ -9,7 +9,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from core import biblioteca, hires
+from core import biblioteca, hires, procesos
 
 # tiddl 3.4.x:  tiddl download [OPCIONES] url <URL_o_shorthand>
 #               tiddl download [OPCIONES] fav -t track
@@ -138,6 +138,7 @@ def _ejecutar(
     except Exception as e:
         yield f"❌ Error al iniciar tiddl: {e}"
         return 1
+    procesos.registrar(process)
 
     estado = {"ultima_linea": time.time(), "estancado": False}
     threading.Thread(
@@ -165,8 +166,11 @@ def _ejecutar(
             except subprocess.TimeoutExpired:
                 process.kill()
         process.stdout.close()
+        if sys.exc_info()[0] is not None:
+            procesos.quitar(process)
 
     process.wait()
+    procesos.quitar(process)
     if estado["estancado"]:
         msg = f"Estancado: tiddl sin actividad {INACTIVIDAD_MAX // 60} min, detenido"
         errores.append(msg)
@@ -178,52 +182,77 @@ def _ejecutar(
 
 
 class _Favoritos:
-    """Índice perezoso de las pistas favoritas, usando la API (y la caché) de tiddl."""
+    """
+    Índice perezoso de pistas para resolver ISRC y Atmos, usando la API (y la
+    caché) de tiddl. Con `ids` primero pide solo esas pistas (las que se
+    descargaron). Si un archivo no aparece ahí (restos de una descarga
+    interrumpida), recorre una vez todos los favoritos, que son cientos de
+    peticiones; sin `ids` lo hace desde el principio.
+    """
 
-    def __init__(self) -> None:
+    def __init__(self, ids: list[int | str] | None = None) -> None:
+        self._ids = [str(i) for i in ids] if ids else None
+        self._leidos: set[str] = set()
+        self._completo = False  # ya se recorrieron todos los favoritos
         self._por_titulo_album: dict[tuple[str, str], object] | None = None
         self._por_titulo: dict[str, list] = {}
         self.error: str | None = None  # fallo al cargar el índice, para avisarlo
         self.fallos: int = 0  # pistas que no se pudieron leer
 
-    def _cargar(self) -> None:
-        self._por_titulo_album = {}
-        try:
-            from rich.console import Console
-            from tiddl.cli.ctx import ContextObject
+    def _api(self):
+        from rich.console import Console
+        from tiddl.cli.ctx import ContextObject
 
-            api = ContextObject(False, None, Console(quiet=True)).api
-            for tid in api.get_favorites().model_dump()["TRACK"]:
-                try:
-                    t = api.get_track(tid)
-                except Exception as e:
-                    # No cortar el índice por una pista, pero contarlo: una
-                    # sesión caducada o un 429 dejaría el índice incompleto y
-                    # se perderían ISRC y detección de Atmos sin avisar.
-                    self.fallos += 1
-                    print(
-                        f"⚠ favoritos: no se pudo leer la pista {tid}: {e!r}",
-                        file=sys.stderr,
-                    )
-                    continue
-                titulo = f"{t.title} ({t.version})" if t.version else t.title
-                self._por_titulo_album[(titulo.casefold(), t.album.title.casefold())] = (
-                    t
-                )
-                self._por_titulo.setdefault(t.title.casefold(), []).append(t)
-                self._por_titulo.setdefault(titulo.casefold(), []).append(t)
+        return ContextObject(False, None, Console(quiet=True)).api
+
+    def _indexar(self, api, ids) -> None:
+        for tid in ids:
+            if str(tid) in self._leidos:
+                continue
+            self._leidos.add(str(tid))
+            try:
+                t = api.get_track(tid)
+            except Exception as e:
+                # No cortar el índice por una pista, pero contarlo: una
+                # sesión caducada o un 429 dejaría el índice incompleto y
+                # se perderían ISRC y detección de Atmos sin avisar.
+                self.fallos += 1
+                print(f"⚠ pistas: no se pudo leer la pista {tid}: {e!r}", file=sys.stderr)
+                continue
+            titulo = f"{t.title} ({t.version})" if t.version else t.title
+            self._por_titulo_album[(titulo.casefold(), t.album.title.casefold())] = t
+            self._por_titulo.setdefault(t.title.casefold(), []).append(t)
+            self._por_titulo.setdefault(titulo.casefold(), []).append(t)
+
+    def _cargar(self, todos: bool) -> None:
+        if self._por_titulo_album is None:
+            self._por_titulo_album = {}
+        try:
+            api = self._api()
+            if todos:
+                self._completo = True
+                self._indexar(api, api.get_favorites().model_dump()["TRACK"])
+            else:
+                self._indexar(api, self._ids)
         except Exception as e:
             self.error = repr(e)
-            print(f"⚠ favoritos: no se pudo cargar el índice: {e!r}", file=sys.stderr)
+            print(f"⚠ pistas: no se pudo cargar el índice: {e!r}", file=sys.stderr)
+
+    def _asegurar(self) -> None:
+        if self._por_titulo_album is None:
+            self._cargar(todos=self._ids is None)
 
     def buscar(self, titulo: str, album: str):
-        if self._por_titulo_album is None:
-            self._cargar()
-        return self._por_titulo_album.get((titulo.casefold(), album.casefold()))
+        self._asegurar()
+        clave = (titulo.casefold(), album.casefold())
+        if clave not in self._por_titulo_album and not self._completo and self.error is None:
+            self._cargar(todos=True)
+        return self._por_titulo_album.get(clave)
 
     def buscar_titulo(self, titulo: str) -> list:
-        if self._por_titulo_album is None:
-            self._cargar()
+        self._asegurar()
+        if titulo.casefold() not in self._por_titulo and not self._completo and self.error is None:
+            self._cargar(todos=True)
         return self._por_titulo.get(titulo.casefold(), [])
 
 
@@ -319,7 +348,7 @@ def _esta_cifrado(path: Path, info: dict) -> bool:
     return False
 
 
-def _postprocesar(output_dir: str, errores: list[str]):
+def _postprocesar(output_dir: str, errores: list[str], ids: list[int | str] | None = None):
     """
     - Atmos cifrado o ilegible → se borra y se anota en logs/tidal_atmos_omitidas.txt
     - Pistas Atmos con error en tiddl → se anotan en el mismo log
@@ -329,7 +358,7 @@ def _postprocesar(output_dir: str, errores: list[str]):
     """
     from mutagen.mp4 import MP4, MP4FreeForm
 
-    favoritos = _Favoritos()
+    favoritos = _Favoritos(ids)
     base = Path(output_dir).expanduser()
     # Todos los .m4a (son pocos: Atmos y AAC), así se reparan también los de
     # una ejecución interrumpida antes del post-proceso
@@ -407,9 +436,9 @@ def _postprocesar(output_dir: str, errores: list[str]):
     # Si el índice de favoritos no se cargó bien, el post-proceso (ISRC y
     # detección de Atmos) quedó incompleto: avisarlo en vez de callarlo.
     if favoritos.error:
-        yield f"⚠ No se pudo leer tus favoritos de Tidal ({favoritos.error}); ISRC y Atmos pueden quedar incompletos"
+        yield f"⚠ No se pudieron leer las pistas en Tidal ({favoritos.error}); ISRC y Atmos pueden quedar incompletos"
     elif favoritos.fallos:
-        yield f"⚠ {favoritos.fallos} favorito(s) no se pudieron leer; algún ISRC o Atmos pudo quedar sin resolver"
+        yield f"⚠ {favoritos.fallos} pista(s) no se pudieron leer en Tidal; algún ISRC o Atmos pudo quedar sin resolver"
 
 
 def _pasada_con_reintentos(
@@ -453,7 +482,7 @@ def _limpiar_temporales(output_dir: str):
         yield f"🧹 {borrados} temporal(es) de una descarga interrumpida eliminados"
 
 
-def _descargar(destino_args: list[str], output_dir: str):
+def _descargar(destino_args: list[str], output_dir: str, ids: list[int | str] | None = None):
     try:
         exe = _tiddl_exe()
     except FileNotFoundError as e:
@@ -490,7 +519,7 @@ def _descargar(destino_args: list[str], output_dir: str):
     # Los errores que ya salieron en la primera pasada no se duplican
     errores += [e for e in errores_estereo if e not in errores]
 
-    yield from _postprocesar(output_dir, errores)
+    yield from _postprocesar(output_dir, errores, ids)
     yield from _limpiar_temporales(output_dir)
     yield from biblioteca.aplanar(base)
     # tiddl solo recibe 16-bit; lo que Tidal tiene en Hi-Res se mejora aparte
@@ -510,7 +539,8 @@ def descargar_pistas(ids: list[int | str], base: Path):
     Quien llama ya quitó las que estaban en disco. Hace yield de cada línea para
     SSE y devuelve el código de salida.
     """
-    return (yield from _descargar(["url", *(f"track/{i}" for i in ids)], str(base)))
+    ids = list(ids)
+    return (yield from _descargar(["url", *(f"track/{i}" for i in ids)], str(base), ids))
 
 
 def verificar_tiddl() -> tuple[bool, str]:

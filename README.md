@@ -191,7 +191,7 @@ Each tool can also be run on its own (they use the saved Tidal session):
 ## Tests
 
 ```bash
-.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/pip install --require-hashes -r requirements-dev.lock   # versiones fijas con hash, como el CI
 .venv/bin/playwright install chromium    # first time only, for the page tests
 .venv/bin/python -m pytest
 ```
@@ -211,7 +211,7 @@ scripts/construir-css.sh
 ```
 tidal/
 ├── app.py                  # Flask web server
-├── requirements.txt, requirements-dev.txt, pytest.ini
+├── requirements.txt, requirements-dev.txt, requirements-dev.lock, pytest.ini
 ├── core/
 │   ├── enlaces.py          # parses pasted links, share text and IDs
 │   ├── recursos.py         # preview and download of any link or My Tracks

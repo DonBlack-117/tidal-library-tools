@@ -12,6 +12,7 @@ tiddl tiene su propia sesión y solo se usa para descargar.
 import os
 import sys
 import threading
+import time
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -30,6 +31,20 @@ class SinSesion(RuntimeError):
 # mismo archivo: sin candado, dos escrituras a la vez pueden dejarlo cortado
 _lock = threading.Lock()
 
+# Comprobar la sesión cuesta dos o tres peticiones a Tidal. La sesión ya
+# comprobada se reutiliza este tiempo (heurística propia: 5 min basta para no
+# repetir la comprobación en cada clic y deja ver pronto un cierre de sesión).
+# Si el token caduca antes, tidalapi lo renueva solo con el refresh token.
+VIGENCIA_SEGUNDOS = 300
+_cache: tuple[object, float] | None = None  # (sesión, time.monotonic() al comprobarla)
+
+
+def olvidar() -> None:
+    """Descarta la sesión en memoria (tras un login nuevo, o en pruebas)."""
+    global _cache
+    with _lock:
+        _cache = None
+
 
 def sesion():
     """
@@ -39,7 +54,11 @@ def sesion():
     """
     import tidalapi
 
+    global _cache
     with _lock:
+        if _cache is not None and time.monotonic() - _cache[1] < VIGENCIA_SEGUNDOS:
+            return _cache[0]
+        _cache = None
         if not SESSION_FILE.exists():
             return None
         s = tidalapi.Session()
@@ -51,6 +70,7 @@ def sesion():
             return None
         s.audio_quality = tidalapi.Quality.hi_res_lossless
         _guardar(s)  # el token pudo renovarse
+        _cache = (s, time.monotonic())
         return s
 
 

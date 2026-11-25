@@ -250,3 +250,45 @@ def test_seleccion_invalida(client, ids):
     r = post(client, "/run/descargar", {"mytracks": True, "ids": ids})
     assert r.status_code == 400
     assert r.json["error"]["code"] == "SELECCION_INVALIDA"
+
+
+# ── Duplicados: vista previa antes de borrar ─────────────────────────────────
+
+
+def _capturar_proceso(monkeypatch):
+    llamadas = []
+
+    def falso(modulo, env, confirmar):
+        llamadas.append((modulo, env, confirmar))
+        yield "listo"
+        return 0
+
+    monkeypatch.setattr(servidor, "_proceso", falso)
+    return llamadas
+
+
+def test_duplicados_sin_confirmar_solo_muestra_la_vista(client, monkeypatch):
+    from core.limpiar_duplicados import SOLO_VISTA_ENV
+
+    llamadas = _capturar_proceso(monkeypatch)
+    eventos(post(client, "/run/dupes", {"confirmado": "true"}))  # solo vale el booleano
+    modulo, env, confirmar = llamadas[0]
+    assert modulo == "core.limpiar_duplicados"
+    assert confirmar is False
+    assert env[SOLO_VISTA_ENV] == "1"
+
+
+def test_duplicados_confirmado_borra(client, monkeypatch):
+    from core.limpiar_duplicados import SOLO_VISTA_ENV
+
+    llamadas = _capturar_proceso(monkeypatch)
+    eventos(post(client, "/run/dupes", {"confirmado": True}))
+    _, env, confirmar = llamadas[0]
+    assert confirmar is True
+    assert SOLO_VISTA_ENV not in env
+
+
+def test_mejorar_calidad_sigue_confirmando_con_un_clic(client, monkeypatch):
+    llamadas = _capturar_proceso(monkeypatch)
+    eventos(post(client, "/run/quality"))
+    assert llamadas[0][2] is True
